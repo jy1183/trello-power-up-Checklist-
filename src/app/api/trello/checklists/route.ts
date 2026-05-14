@@ -31,7 +31,7 @@ export async function GET(request: Request) {
         const boards = boardsRes.data;
 
         const promises = boards.map((b: any) =>
-            axios.get('https://api.trello.com/1/boards/' + b.id + '/cards?checklists=all&fields=id,name,shortUrl&key=' + TRELLO_API_KEY + '&token=' + TRELLO_API_TOKEN)
+            axios.get('https://api.trello.com/1/boards/' + b.id + '/cards?checklists=all&fields=id,name,shortUrl,idMembers&members=true&member_fields=fullName,avatarUrl,username&key=' + TRELLO_API_KEY + '&token=' + TRELLO_API_TOKEN)
                 .catch(e => { console.error('Error on board ' + b.name + ': ' + e.message); return { data: [] }; })
         );
 
@@ -54,7 +54,13 @@ export async function GET(request: Request) {
                                         id: item.id, cardId: card.id, title: item.name,
                                         cardName: card.name, cardUrl: card.shortUrl,
                                         listName: cl.name, due: dueDate,
-                                        state: item.state, dayIndex: diffDays
+                                        state: item.state, dayIndex: diffDays,
+                                        members: card.members?.map((m: any) => ({
+                                            id: m.id,
+                                            fullName: m.fullName,
+                                            avatarUrl: m.avatarUrl,
+                                            username: m.username
+                                        })) || []
                                     });
                                 }
                                 // Overdue items (past, incomplete only)
@@ -63,7 +69,13 @@ export async function GET(request: Request) {
                                         id: item.id, cardId: card.id, title: item.name,
                                         cardName: card.name, cardUrl: card.shortUrl,
                                         listName: cl.name, due: dueDate,
-                                        state: item.state, dayIndex: -1
+                                        state: item.state, dayIndex: -1,
+                                        members: card.members?.map((m: any) => ({
+                                            id: m.id,
+                                            fullName: m.fullName,
+                                            avatarUrl: m.avatarUrl,
+                                            username: m.username
+                                        })) || []
                                     });
                                 }
                             }

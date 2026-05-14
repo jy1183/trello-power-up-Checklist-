@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Script from 'next/script';
-import { CheckSquare, Clock, RefreshCw } from 'lucide-react';
+import { CheckSquare, Clock, RefreshCw, Search, MessageSquare, Tag } from 'lucide-react';
 
 export default function ChecklistModal() {
   const [todos, setTodos] = useState<any[]>([]);
@@ -12,6 +12,8 @@ export default function ChecklistModal() {
   const [trello, setTrello] = useState<any>(null);
   const [activityData, setActivityData] = useState<any[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
 
 
 
@@ -152,30 +154,102 @@ export default function ChecklistModal() {
     }
   };
 
+  const getTimeAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return '방금'; if (mins < 60) return mins + '분 전';
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + '시간 전';
+    return Math.floor(hours / 24) + '일 전';
+  };
+
+  const filteredTodos = todos.filter(t => {
+    const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         t.cardName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesMember = !selectedMemberId || (t.members && t.members.some((m: any) => m.id === selectedMemberId));
+    return matchesSearch && matchesMember;
+  });
+
+  const filteredOverdue = overdueTodos.filter(t => {
+    const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         t.cardName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesMember = !selectedMemberId || (t.members && t.members.some((m: any) => m.id === selectedMemberId));
+    return matchesSearch && matchesMember;
+  });
+
+  // Extract unique members from all tasks for filter
+  const allMembers = Array.from(new Set([
+    ...todos.flatMap(t => t.members || []),
+    ...overdueTodos.flatMap(t => t.members || [])
+  ].map(m => m.id))).map(id => {
+    const member = [...todos, ...overdueTodos].flatMap(t => t.members || []).find(m => m.id === id);
+    return member;
+  });
+
   return (
     <div className="w-screen h-screen overflow-hidden flex flex-col bg-[#fcfbf7]">
       <Script src="https://p.trellocdn.com/power-up.min.js" strategy="beforeInteractive" />
-      <div className="p-5 border-b border-black/5 flex justify-between items-center bg-white/60 backdrop-blur-md">
-        <div className="flex items-center gap-3">
+      <div className="p-4 border-b border-black/5 flex justify-between items-center bg-white/60 backdrop-blur-md shrink-0">
+        <div className="flex items-center gap-6">
           <h2 className="text-xl font-bold text-slate-700 tracking-tight flex items-center gap-2"><CheckSquare size={20} className="text-blue-500" /> 통합 체크리스트</h2>
-          <button className="text-xs bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded text-slate-600 transition-colors" onClick={() => { fetchTodos(); if(trello) trello.board('id').then((b: any) => fetchActivity(b.id)); }} disabled={loadingTodos}>{loadingTodos ? '...' : '새로고침'}</button>
+          
+          <div className="flex items-center gap-2">
+            <div className="relative group">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+              <input 
+                type="text" 
+                placeholder="검색..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-4 py-1.5 bg-slate-100 hover:bg-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 border-none rounded-full text-sm w-[180px] transition-all outline-none"
+              />
+            </div>
+
+            {allMembers.length > 0 && (
+              <select 
+                value={selectedMemberId || ''} 
+                onChange={(e) => setSelectedMemberId(e.target.value || null)}
+                className="bg-slate-100 hover:bg-slate-200 py-1.5 px-4 rounded-full text-sm outline-none transition-all cursor-pointer font-medium text-slate-600 appearance-none border-none focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="">전체 멤버</option>
+                {allMembers.map((m: any) => (
+                  <option key={m.id} value={m.id}>{m.fullName}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <button className="text-xs bg-slate-200 hover:bg-slate-300 px-4 py-1.5 rounded-full text-slate-600 font-bold transition-all flex items-center gap-1.5" onClick={() => { fetchTodos(); if(trello) trello.board('id').then((b: any) => fetchActivity(b.id)); }} disabled={loadingTodos}>
+            <RefreshCw size={13} className={loadingTodos ? 'animate-spin' : ''} /> {loadingTodos ? '로딩 중' : '새로고침'}
+          </button>
         </div>
       </div>
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 overflow-x-auto overflow-y-hidden p-5 bg-[#f6f5f0] relative min-w-0 custom-scrollbar">
         <div className={`flex gap-4 h-full transition-opacity duration-300 ${loadingTodos ? 'opacity-40' : 'opacity-100'}`} style={{ width: 'max-content' }}>
-          {overdueTodos.length > 0 && (
+          {filteredOverdue.length > 0 && (
             <div className="flex flex-col h-full rounded-xl border bg-red-50/30 border-red-200 overflow-hidden w-[260px] shrink-0">
-              <div className="py-2.5 px-3 text-center text-sm font-bold border-b bg-red-100/50 text-red-600 border-red-200 flex items-center justify-center gap-1"><Clock size={13} /> 기한 지남</div>
+              <div className="py-2.5 px-3 text-center text-sm font-bold border-b bg-red-100/50 text-red-600 border-red-200 flex items-center justify-center gap-1"><Clock size={13} /> 기한 지남 ({filteredOverdue.length})</div>
               <div className="flex-1 p-2 space-y-2 overflow-y-auto custom-scrollbar">
-                {overdueTodos.map(task => (
+                {filteredOverdue.map(task => (
                   <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task)} className={`p-2.5 rounded-lg border shadow-sm transition-all cursor-move ${task.state === 'complete' ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-red-200 hover:border-red-300'}`}>
                     <div className="flex items-start gap-2">
                       <input type="checkbox" checked={task.state === 'complete'} onChange={() => handleCheck(task.id, task.cardId, task.state)} className="mt-1 w-4 h-4 accent-red-500 rounded cursor-pointer" />
                       <div className="flex-1 min-w-0">
                         <button onClick={() => openCardInTrello(task.cardUrl)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-red-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
-                        <div className="text-[11px] text-slate-500 mt-1 truncate" title={task.cardName}>{task.cardName}</div>
-                        {task.due && <div className="text-[10px] text-red-500 mt-0.5 font-semibold">{new Date(task.due).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</div>}
+                        <div className="flex items-center justify-between mt-1.5">
+                          <div className="text-[11px] text-slate-500 truncate max-w-[140px]" title={task.cardName}>{task.cardName}</div>
+                          {task.members && task.members.length > 0 && (
+                            <div className="flex -space-x-1.5">
+                              {task.members.map((m: any) => (
+                                <div key={m.id} className="w-5 h-5 rounded-full border border-white bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 overflow-hidden" title={m.fullName}>
+                                  {m.avatarUrl ? <img src={`${m.avatarUrl}/30.png`} alt={m.fullName} className="w-full h-full object-cover" /> : m.fullName.charAt(0)}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {task.due && <div className="text-[10px] text-red-500 mt-1 font-semibold">{new Date(task.due).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</div>}
                       </div>
                     </div>
                   </div>
@@ -184,19 +258,30 @@ export default function ChecklistModal() {
             </div>
           )}
           {Array.from({ length: 14 }, (_, i) => i).map(dayOffset => {
-            const dayTasks = todos.filter(t => t.dayIndex === dayOffset);
+            const dayTasks = filteredTodos.filter(t => t.dayIndex === dayOffset);
             const isToday = dayOffset === 0;
             return (
               <div key={dayOffset} className={`flex flex-col h-full rounded-xl border w-[260px] shrink-0 ${isToday ? 'bg-sky-50/30 border-sky-200' : 'bg-white/40 border-slate-100'} overflow-hidden`} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, dayOffset)}>
-                <div className={`py-2.5 px-3 text-center text-sm font-bold border-b ${isToday ? 'bg-sky-100/50 text-sky-700 border-sky-200' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>{getDayName(dayOffset)}</div>
+                <div className={`py-2.5 px-3 text-center text-sm font-bold border-b ${isToday ? 'bg-sky-100/50 text-sky-700 border-sky-200' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>{getDayName(dayOffset)} ({dayTasks.length})</div>
                 <div className="flex-1 p-2 space-y-2 overflow-y-auto custom-scrollbar">
                   {dayTasks.map(task => (
                     <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task)} className={`p-2.5 rounded-lg border shadow-sm transition-all cursor-move ${task.state === 'complete' ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-slate-200 hover:border-sky-300'}`}>
                       <div className="flex items-start gap-2">
                         <input type="checkbox" checked={task.state === 'complete'} onChange={() => handleCheck(task.id, task.cardId, task.state)} className="mt-1 w-4 h-4 accent-sky-500 rounded cursor-pointer" />
-                      <div className="flex-1 min-w-0">
-                        <button onClick={() => openCardInTrello(task.cardUrl)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-sky-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
-                        <div className="text-[11px] text-slate-500 mt-1 truncate" title={task.cardName}>{task.cardName}</div>
+                        <div className="flex-1 min-w-0">
+                          <button onClick={() => openCardInTrello(task.cardUrl)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-sky-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
+                          <div className="flex items-center justify-between mt-1.5">
+                            <div className="text-[11px] text-slate-500 truncate max-w-[140px]" title={task.cardName}>{task.cardName}</div>
+                            {task.members && task.members.length > 0 && (
+                              <div className="flex -space-x-1.5">
+                                {task.members.map((m: any) => (
+                                  <div key={m.id} className="w-5 h-5 rounded-full border border-white bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 overflow-hidden" title={m.fullName}>
+                                    {m.avatarUrl ? <img src={`${m.avatarUrl}/30.png`} alt={m.fullName} className="w-full h-full object-cover" /> : m.fullName.charAt(0)}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -225,15 +310,32 @@ export default function ChecklistModal() {
               <div className="text-center text-slate-400 text-xs py-10">최근 활동 내역이 없습니다.</div>
             ) : activityData.map((a) => (
               <div key={a.id} className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm transition-hover hover:border-slate-300">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 overflow-hidden">
-                    {a.memberName ? a.memberName.charAt(0).toUpperCase() : '?'}
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 overflow-hidden">
+                      {a.memberName ? a.memberName.charAt(0).toUpperCase() : '?'}
+                    </div>
+                    <span className="text-[12px] font-bold text-slate-700">{a.memberName}</span>
                   </div>
-                  <div className="text-[11px] text-slate-400 font-medium">
-                    {new Date(a.date).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  <div className="text-[10px] text-slate-400 font-medium">
+                    {getTimeAgo(a.date)}
                   </div>
                 </div>
-                <div className="text-[13px] text-slate-500"><span className="font-bold text-slate-700">{a.memberName}</span> <span className="text-sky-600">{getActivityText(a)}</span></div>
+                <div className="text-[12px] text-sky-600 font-medium mb-1">{getActivityText(a)}</div>
+                {a.cardName && (
+                  <button 
+                    onClick={() => openCardInTrello(a.cardUrl)}
+                    className="text-[11px] text-slate-500 hover:text-blue-600 text-left w-full truncate flex items-center gap-1 mt-1 font-semibold transition-colors"
+                  >
+                    <Tag size={10} /> {a.cardName}
+                  </button>
+                )}
+                {a.text && (
+                  <div className="text-[11px] text-slate-400 mt-1.5 bg-slate-50 p-1.5 rounded flex items-start gap-1">
+                    <MessageSquare size={10} className="mt-0.5 shrink-0" />
+                    <span className="line-clamp-2 italic">{a.text}</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
