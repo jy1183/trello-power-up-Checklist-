@@ -1,0 +1,17 @@
+{
+  "name": "WellAsset Checklist Power-Up",
+  "author": "WellAsset",
+  "description": "통합 체크리스트 관리 파워업",
+  "details": "전체 보드의 체크리스트를 한 번에 확인하고 관리할 수 있습니다.",
+  "icons": {
+    "24": "https://p.trellocdn.com/power-up/power-up-24.png"
+  },
+  "capabilities": [
+    "board-buttons"
+  ],
+  "connectors": {
+    "iframe": {
+      "url": "/connector"
+    }
+  }
+}
