@@ -82,9 +82,14 @@ export async function GET(request: Request) {
             overdueTasks: overdueItems
         });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error fetching Trello Checklists:', error);
-        return NextResponse.json({ error: 'Failed to fetch Trello tasks' }, { status: 500 });
+        // 클라이언트(브라우저)에서 정확한 에러 원인을 파악하기 위해 상세 에러 메시지 반환
+        const errorMessage = error.response?.data || error.message || 'Unknown error';
+        return NextResponse.json({ 
+            error: 'Failed to fetch Trello tasks', 
+            details: errorMessage 
+        }, { status: 500 });
     }
 }
 

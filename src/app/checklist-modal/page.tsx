@@ -37,9 +37,15 @@ export default function ChecklistModal() {
     try {
       const res = await fetch('/api/trello/checklists?days=13&overdue=true');
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.details || data.error || 'Unknown server error');
+      }
       if (data.tasks) setTodos(data.tasks);
       if (data.overdueTasks) setOverdueTodos(data.overdueTasks);
-    } catch (e) { console.error(e); } finally { setLoadingTodos(false); }
+    } catch (e: any) { 
+      console.error(e); 
+      alert('서버 에러 원인: ' + e.message);
+    } finally { setLoadingTodos(false); }
   };
 
   const handleCheck = async (taskId: string, cardId: string, currentState: string) => {
@@ -53,9 +59,11 @@ export default function ChecklistModal() {
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify({ cardId, itemId: taskId, state: newState }) 
       }); 
-    }
-    catch (e) { 
-      console.error(e); 
+    } catch (err: any) {
+      console.error('Error updating task:', err);
+      if (err.response && err.response.data) {
+        console.error('Detailed API Error:', err.response.data);
+      }
       const revertTask = (t: any) => t.id === taskId ? { ...t, state: currentState } : t; 
       setTodos(prev => prev.map(revertTask)); 
     }
