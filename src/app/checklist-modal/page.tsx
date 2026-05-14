@@ -2,21 +2,41 @@
 
 import { useState, useEffect } from 'react';
 import Script from 'next/script';
-import { CheckSquare, Clock } from 'lucide-react';
+import { CheckSquare, Clock, RefreshCw } from 'lucide-react';
 
 export default function ChecklistModal() {
   const [todos, setTodos] = useState<any[]>([]);
   const [overdueTodos, setOverdueTodos] = useState<any[]>([]);
   const [loadingTodos, setLoadingTodos] = useState(true);
 
-  // Initialize Trello Power-Up context
   const [trello, setTrello] = useState<any>(null);
+  const [activityData, setActivityData] = useState<any[]>([]);
+  const [loadingActivity, setLoadingActivity] = useState(false);
+
+
+
+  const fetchActivity = async (boardId: string) => {
+    setLoadingActivity(true);
+    try { 
+      const res = await fetch('/api/trello/activity?boardId=' + boardId + '&limit=30'); 
+      const data = await res.json(); 
+      if (data.actions) setActivityData(data.actions); 
+    }
+    catch (e) { console.error(e); } 
+    finally { setLoadingActivity(false); }
+  };
 
   useEffect(() => {
     fetchTodos();
     const initT = () => {
       if ((window as any).TrelloPowerUp) {
-        setTrello((window as any).TrelloPowerUp.iframe());
+        const t = (window as any).TrelloPowerUp.iframe();
+        setTrello(t);
+        t.board('id').then((board: any) => {
+          if (board && board.id) {
+            fetchActivity(board.id);
+          }
+        }).catch(console.error);
       }
     };
     if ((window as any).TrelloPowerUp) {
@@ -52,6 +72,7 @@ export default function ChecklistModal() {
     const newState = currentState === 'complete' ? 'incomplete' : 'complete';
     const updateTask = (t: any) => t.id === taskId ? { ...t, state: newState } : t;
     setTodos(prev => prev.map(updateTask));
+    setOverdueTodos(prev => prev.map(updateTask));
     
     try { 
       await fetch('/api/trello/checklists', { 
@@ -66,14 +87,15 @@ export default function ChecklistModal() {
       }
       const revertTask = (t: any) => t.id === taskId ? { ...t, state: currentState } : t; 
       setTodos(prev => prev.map(revertTask)); 
+      setOverdueTodos(prev => prev.map(revertTask));
     }
   };
 
-  const openCardInTrello = (cardId: string) => {
+  const openCardInTrello = (cardUrl: string) => {
     if (trello) {
-      trello.showCard(cardId);
+      trello.navigate({ url: cardUrl });
     } else {
-      console.warn("Trello instance not available");
+      window.open(cardUrl, '_blank');
     }
   };
 
@@ -87,9 +109,23 @@ export default function ChecklistModal() {
     newDate.setHours(currentDue.getHours() || 12, currentDue.getMinutes() || 0, 0);
     const newDueIso = newDate.toISOString();
     const updateTask = (t: any) => t.id === task.id ? { ...t, dayIndex: targetDayOffset, due: newDueIso } : t;
-    setTodos(prev => prev.map(updateTask));
+    setTodos(prev => {
+      if (prev.some(t => t.id === task.id)) return prev.map(updateTask);
+      return [...prev, { ...task, dayIndex: targetDayOffset, due: newDueIso }];
+    });
+    if (task.dayIndex === -1) {
+      setOverdueTodos(prev => prev.filter(t => t.id !== task.id));
+    }
     try { await fetch('/api/trello/checklists', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cardId: task.cardId, itemId: task.id, dueDate: newDueIso }) }); }
-    catch (err) { console.error(err); setTodos(prev => prev.map(t => t.id === task.id ? task : t)); }
+    catch (err) { 
+      console.error(err); 
+      if (task.dayIndex === -1) {
+        setOverdueTodos(prev => [...prev, task]);
+        setTodos(prev => prev.filter(t => t.id !== task.id));
+      } else {
+        setTodos(prev => prev.map(t => t.id === task.id ? task : t)); 
+      }
+    }
   };
 
   const getDayName = (offset: number) => {
@@ -99,27 +135,45 @@ export default function ChecklistModal() {
     return dates[d.getDay()] + ' (' + (d.getMonth() + 1) + '/' + d.getDate() + ')';
   };
 
+  const getActivityText = (a: any) => {
+    switch(a.type) {
+      case 'createCard': return `님이 '${a.cardName}' 카드를 생성했습니다.`;
+      case 'updateCard': 
+        if (a.listBefore && a.listAfter) return `님이 '${a.cardName}' 카드를 '${a.listBefore}'에서 '${a.listAfter}'(으)로 이동했습니다.`;
+        if (a.text) return `님이 '${a.cardName}' 카드를 수정했습니다.`;
+        return `님이 '${a.cardName}' 카드를 변경했습니다.`;
+      case 'updateCheckItemStateOnCard':
+        const stateStr = a.checkItemState === 'complete' ? '완료' : '미완료';
+        return `님이 '${a.cardName}'의 체크항목 '${a.checkItem}'을(를) ${stateStr} 처리했습니다.`;
+      case 'commentCard': return `님이 '${a.cardName}'에 댓글을 남겼습니다: "${a.text}"`;
+      case 'addAttachmentToCard': return `님이 '${a.cardName}'에 첨부파일을 추가했습니다.`;
+      case 'addMemberToCard': return `님이 '${a.cardName}'에 멤버를 추가했습니다.`;
+      default: return `님이 활동을 수행했습니다 (${a.type}).`;
+    }
+  };
+
   return (
     <div className="w-screen h-screen overflow-hidden flex flex-col bg-[#fcfbf7]">
       <Script src="https://p.trellocdn.com/power-up.min.js" strategy="beforeInteractive" />
       <div className="p-5 border-b border-black/5 flex justify-between items-center bg-white/60 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-bold text-slate-700 tracking-tight flex items-center gap-2"><CheckSquare size={20} className="text-blue-500" /> 통합 체크리스트</h2>
-          <button className="text-xs bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded text-slate-600 transition-colors" onClick={fetchTodos} disabled={loadingTodos}>{loadingTodos ? '...' : '새로고침'}</button>
+          <button className="text-xs bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded text-slate-600 transition-colors" onClick={() => { fetchTodos(); if(trello) trello.board('id').then((b: any) => fetchActivity(b.id)); }} disabled={loadingTodos}>{loadingTodos ? '...' : '새로고침'}</button>
         </div>
       </div>
-      <div className="flex-1 overflow-x-auto overflow-y-hidden p-5 bg-[#f6f5f0] relative min-w-0">
+      <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 overflow-x-auto overflow-y-hidden p-5 bg-[#f6f5f0] relative min-w-0 custom-scrollbar">
         <div className={`flex gap-4 h-full transition-opacity duration-300 ${loadingTodos ? 'opacity-40' : 'opacity-100'}`} style={{ width: 'max-content' }}>
           {overdueTodos.length > 0 && (
             <div className="flex flex-col h-full rounded-xl border bg-red-50/30 border-red-200 overflow-hidden w-[260px] shrink-0">
               <div className="py-2.5 px-3 text-center text-sm font-bold border-b bg-red-100/50 text-red-600 border-red-200 flex items-center justify-center gap-1"><Clock size={13} /> 기한 지남</div>
               <div className="flex-1 p-2 space-y-2 overflow-y-auto custom-scrollbar">
                 {overdueTodos.map(task => (
-                  <div key={task.id} className={`p-2.5 rounded-lg border shadow-sm transition-all ${task.state === 'complete' ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-red-200 hover:border-red-300'}`}>
+                  <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task)} className={`p-2.5 rounded-lg border shadow-sm transition-all cursor-move ${task.state === 'complete' ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-red-200 hover:border-red-300'}`}>
                     <div className="flex items-start gap-2">
                       <input type="checkbox" checked={task.state === 'complete'} onChange={() => handleCheck(task.id, task.cardId, task.state)} className="mt-1 w-4 h-4 accent-red-500 rounded cursor-pointer" />
                       <div className="flex-1 min-w-0">
-                        <button onClick={() => openCardInTrello(task.cardId)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-red-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
+                        <button onClick={() => openCardInTrello(task.cardUrl)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-red-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
                         <div className="text-[11px] text-slate-500 mt-1 truncate" title={task.cardName}>{task.cardName}</div>
                         {task.due && <div className="text-[10px] text-red-500 mt-0.5 font-semibold">{new Date(task.due).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</div>}
                       </div>
@@ -140,9 +194,9 @@ export default function ChecklistModal() {
                     <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task)} className={`p-2.5 rounded-lg border shadow-sm transition-all cursor-move ${task.state === 'complete' ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-slate-200 hover:border-sky-300'}`}>
                       <div className="flex items-start gap-2">
                         <input type="checkbox" checked={task.state === 'complete'} onChange={() => handleCheck(task.id, task.cardId, task.state)} className="mt-1 w-4 h-4 accent-sky-500 rounded cursor-pointer" />
-                        <div className="flex-1 min-w-0">
-                          <button onClick={() => openCardInTrello(task.cardId)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-sky-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
-                          <div className="text-[11px] text-slate-500 mt-1 truncate" title={task.cardName}>{task.cardName}</div>
+                      <div className="flex-1 min-w-0">
+                        <button onClick={() => openCardInTrello(task.cardUrl)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-sky-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
+                        <div className="text-[11px] text-slate-500 mt-1 truncate" title={task.cardName}>{task.cardName}</div>
                         </div>
                       </div>
                     </div>
@@ -154,6 +208,36 @@ export default function ChecklistModal() {
           })}
         </div>
         {loadingTodos && <div className="absolute inset-0 flex justify-center items-center bg-white/10 backdrop-blur-[1px] z-10"><div className="flex flex-col items-center gap-2"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-sky-500"></div><div className="text-xs font-bold text-sky-600 bg-white/80 px-2 py-0.5 rounded shadow-sm">업데이트 중...</div></div></div>}
+        </div>
+        
+        {/* Activity Panel */}
+        <div className="w-[280px] shrink-0 border-l border-slate-200 bg-slate-50 flex flex-col">
+          <div className="py-2.5 px-3 border-b bg-slate-200/80 border-slate-200 flex items-center justify-between">
+            <h3 className="text-[15px] font-bold text-slate-700 flex items-center gap-1.5"><Clock size={14} /> Activity</h3>
+            <button onClick={() => { if (trello) trello.board('id').then((b: any) => fetchActivity(b.id)); }} className="text-slate-400 hover:text-sky-500 transition-colors" title="새로고침">
+              <RefreshCw size={12} className={loadingActivity ? 'animate-spin' : ''} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar relative">
+            {loadingActivity && activityData.length === 0 ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/50"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-slate-400"></div></div>
+            ) : activityData.length === 0 ? (
+              <div className="text-center text-slate-400 text-xs py-10">최근 활동 내역이 없습니다.</div>
+            ) : activityData.map((a) => (
+              <div key={a.id} className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm transition-hover hover:border-slate-300">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 overflow-hidden">
+                    {a.memberName ? a.memberName.charAt(0).toUpperCase() : '?'}
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-medium">
+                    {new Date(a.date).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+                <div className="text-[13px] text-slate-500"><span className="font-bold text-slate-700">{a.memberName}</span> <span className="text-sky-600">{getActivityText(a)}</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
