@@ -12,7 +12,10 @@ export default function Connector() {
           'board-buttons': function (t: any, options: any) {
             return [
               {
-                icon: 'https://p.trellocdn.com/power-up/power-up-24.png',
+                icon: {
+                  dark: 'data:image/svg+xml;charset=utf-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%23ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"%3E%3Cpolyline points="9 11 12 14 22 4"%3E%3C/polyline%3E%3Cpath d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"%3E%3C/path%3E%3C/svg%3E',
+                  light: 'data:image/svg+xml;charset=utf-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%2342526E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"%3E%3Cpolyline points="9 11 12 14 22 4"%3E%3C/polyline%3E%3Cpath d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"%3E%3C/path%3E%3C/svg%3E'
+                },
                 text: '전체 체크리스트 보기',
                 condition: 'always',
                 callback: function (t: any) {
