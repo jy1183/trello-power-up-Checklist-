@@ -17,10 +17,11 @@ export default function ChecklistModal() {
 
 
 
-  const fetchActivity = async (boardId: string) => {
+  const fetchActivity = async (boardId?: string) => {
     setLoadingActivity(true);
     try { 
-      const res = await fetch('/api/trello/activity?boardId=' + boardId + '&limit=30'); 
+      const url = boardId ? `/api/trello/activity?boardId=${boardId}&limit=30` : '/api/trello/activity?limit=30';
+      const res = await fetch(url); 
       const data = await res.json(); 
       if (data.actions) setActivityData(data.actions); 
     }
@@ -34,11 +35,8 @@ export default function ChecklistModal() {
       if ((window as any).TrelloPowerUp) {
         const t = (window as any).TrelloPowerUp.iframe();
         setTrello(t);
-        t.board('id').then((board: any) => {
-          if (board && board.id) {
-            fetchActivity(board.id);
-          }
-        }).catch(console.error);
+        // By default, fetch integrated activity from all boards
+        fetchActivity();
       }
     };
     if ((window as any).TrelloPowerUp) {
@@ -96,6 +94,7 @@ export default function ChecklistModal() {
   const openCardInTrello = (cardUrl: string) => {
     if (trello) {
       trello.navigate({ url: cardUrl });
+      trello.closeModal();
     } else {
       window.open(cardUrl, '_blank');
     }
@@ -219,7 +218,7 @@ export default function ChecklistModal() {
             )}
           </div>
 
-          <button className="text-xs bg-slate-200 hover:bg-slate-300 px-4 py-1.5 rounded-full text-slate-600 font-bold transition-all flex items-center gap-1.5" onClick={() => { fetchTodos(); if(trello) trello.board('id').then((b: any) => fetchActivity(b.id)); }} disabled={loadingTodos}>
+          <button className="text-xs bg-slate-200 hover:bg-slate-300 px-4 py-1.5 rounded-full text-slate-600 font-bold transition-all flex items-center gap-1.5" onClick={() => { fetchTodos(); fetchActivity(); }} disabled={loadingTodos}>
             <RefreshCw size={13} className={loadingTodos ? 'animate-spin' : ''} /> {loadingTodos ? '로딩 중' : '새로고침'}
           </button>
         </div>
@@ -298,8 +297,8 @@ export default function ChecklistModal() {
         {/* Activity Panel */}
         <div className="w-[280px] shrink-0 border-l border-slate-200 bg-slate-50 flex flex-col">
           <div className="py-2.5 px-3 border-b bg-slate-200/80 border-slate-200 flex items-center justify-between">
-            <h3 className="text-[15px] font-bold text-slate-700 flex items-center gap-1.5"><Clock size={14} /> Activity</h3>
-            <button onClick={() => { if (trello) trello.board('id').then((b: any) => fetchActivity(b.id)); }} className="text-slate-400 hover:text-sky-500 transition-colors" title="새로고침">
+            <h3 className="text-[15px] font-bold text-slate-700 flex items-center gap-1.5"><Clock size={14} /> 통합 Activity</h3>
+            <button onClick={() => fetchActivity()} className="text-slate-400 hover:text-sky-500 transition-colors" title="새로고침">
               <RefreshCw size={12} className={loadingActivity ? 'animate-spin' : ''} />
             </button>
           </div>
@@ -322,6 +321,7 @@ export default function ChecklistModal() {
                   </div>
                 </div>
                 <div className="text-[12px] text-sky-600 font-medium mb-1">{getActivityText(a)}</div>
+                <div className="text-[10px] text-slate-400 mb-1">{a.boardName}</div>
                 {a.cardName && (
                   <button 
                     onClick={() => openCardInTrello(a.cardUrl)}
