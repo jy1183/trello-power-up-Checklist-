@@ -92,12 +92,8 @@ export default function ChecklistModal() {
   };
 
   const openCardInTrello = (cardUrl: string) => {
-    if (trello) {
-      trello.navigate({ url: cardUrl });
-      trello.closeModal();
-    } else {
-      window.open(cardUrl, '_blank');
-    }
+    // Open in a new tab to maintain the checklist state in the current tab
+    window.open(cardUrl, '_blank');
   };
 
   const handleDragStart = (e: React.DragEvent, task: any) => { e.dataTransfer.setData('task', JSON.stringify(task)); };
@@ -138,18 +134,16 @@ export default function ChecklistModal() {
 
   const getActivityText = (a: any) => {
     switch(a.type) {
-      case 'createCard': return `님이 '${a.cardName}' 카드를 생성했습니다.`;
+      case 'createCard': return `카드 생성`;
       case 'updateCard': 
-        if (a.listBefore && a.listAfter) return `님이 '${a.cardName}' 카드를 '${a.listBefore}'에서 '${a.listAfter}'(으)로 이동했습니다.`;
-        if (a.text) return `님이 '${a.cardName}' 카드를 수정했습니다.`;
-        return `님이 '${a.cardName}' 카드를 변경했습니다.`;
+        if (a.listBefore && a.listAfter) return `이동: ${a.listBefore} → ${a.listAfter}`;
+        return `카드 수정`;
       case 'updateCheckItemStateOnCard':
-        const stateStr = a.checkItemState === 'complete' ? '완료' : '미완료';
-        return `님이 '${a.cardName}'의 체크항목 '${a.checkItem}'을(를) ${stateStr} 처리했습니다.`;
-      case 'commentCard': return `님이 '${a.cardName}'에 댓글을 남겼습니다: "${a.text}"`;
-      case 'addAttachmentToCard': return `님이 '${a.cardName}'에 첨부파일을 추가했습니다.`;
-      case 'addMemberToCard': return `님이 '${a.cardName}'에 멤버를 추가했습니다.`;
-      default: return `님이 활동을 수행했습니다 (${a.type}).`;
+        return a.checkItemState === 'complete' ? `체크 완료: ${a.checkItem}` : `체크 해제: ${a.checkItem}`;
+      case 'commentCard': return `댓글 추가`;
+      case 'addAttachmentToCard': return `첨부파일 추가`;
+      case 'addMemberToCard': return `멤버 추가`;
+      default: return `활동: ${a.type}`;
     }
   };
 
