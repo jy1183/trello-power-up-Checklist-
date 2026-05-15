@@ -208,8 +208,8 @@ export default function ChecklistModal() {
   const openCardInTrello = (cardUrl: string) => {
     // Attempt to force a small popup window. 
     // Modern browsers sometimes ignore these unless 'popup=yes' or specific features are used.
-    const width = 850;
-    const height = 950;
+    const width = 1100;
+    const height = 800;
     const left = (window.screen.width - width) / 2;
     const top = (window.screen.height - height) / 2;
 
