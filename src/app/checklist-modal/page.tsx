@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Script from 'next/script';
-import { CheckSquare, Clock, RefreshCw, Search, MessageSquare, Tag } from 'lucide-react';
+import { CheckSquare, Clock, RefreshCw, Search, MessageSquare, Tag, AlignLeft, Paperclip, ExternalLink, Send, Plus, X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 
 export default function ChecklistModal() {
   const [todos, setTodos] = useState<any[]>([]);
@@ -14,6 +17,17 @@ export default function ChecklistModal() {
   const [loadingActivity, setLoadingActivity] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+
+  // Card Modal states
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [cardDetails, setCardDetails] = useState<any>(null);
+  const [loadingCard, setLoadingCard] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [addingChecklistId, setAddingChecklistId] = useState<string | null>(null);
+  const [newCheckItemName, setNewCheckItemName] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
 
 
 
@@ -27,6 +41,106 @@ export default function ChecklistModal() {
     }
     catch (e) { console.error(e); } 
     finally { setLoadingActivity(false); }
+  };
+
+  const openCardModal = async (cardId: string) => {
+    setSelectedCardId(cardId);
+    setLoadingCard(true);
+    setCardDetails(null);
+    setCommentText('');
+    setIsDescriptionExpanded(false);
+    try {
+      const res = await fetch(`/api/trello/card?cardId=${cardId}`);
+      const data = await res.json();
+      setCardDetails(data);
+    } catch (e) {
+      console.error('Failed to fetch card:', e);
+    } finally {
+      setLoadingCard(false);
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!commentText.trim() || !selectedCardId) return;
+    try {
+      await fetch('/api/trello/card/comment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId: selectedCardId, text: commentText })
+      });
+      setCommentText('');
+      // Reload card
+      const res = await fetch(`/api/trello/card?cardId=${selectedCardId}`);
+      const data = await res.json();
+      setCardDetails(data);
+      fetchActivity();
+    } catch (e) {
+      console.error('Failed to add comment', e);
+    }
+  };
+
+  const handleAddCheckItem = async (checklistId: string) => {
+    if (!newCheckItemName.trim()) return;
+    try {
+      await fetch('/api/trello/checklists/item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checklistId, name: newCheckItemName })
+      });
+      setAddingChecklistId(null);
+      setNewCheckItemName('');
+      if (selectedCardId) {
+        const res = await fetch(`/api/trello/card?cardId=${selectedCardId}`);
+        const data = await res.json();
+        setCardDetails(data);
+      }
+    } catch (e) { console.error('Failed to add check item', e); }
+  };
+
+  const handleDeleteCheckItem = async (checklistId: string, itemId: string) => {
+    if (!confirm('항목을 삭제하시겠습니까?')) return;
+    try {
+      await fetch(`/api/trello/checklists/item?checklistId=${checklistId}&itemId=${itemId}`, {
+        method: 'DELETE'
+      });
+      if (selectedCardId) {
+        const res = await fetch(`/api/trello/card?cardId=${selectedCardId}`);
+        const data = await res.json();
+        setCardDetails(data);
+      }
+    } catch (e) { console.error('Failed to delete check item', e); }
+  };
+
+  const handleEditComment = async (actionId: string) => {
+    if (!editingCommentText.trim() || !selectedCardId) return;
+    try {
+      await fetch('/api/trello/card/comment', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actionId, text: editingCommentText })
+      });
+      setEditingCommentId(null);
+      setEditingCommentText('');
+      const res = await fetch(`/api/trello/card?cardId=${selectedCardId}`);
+      const data = await res.json();
+      setCardDetails(data);
+    } catch (e) { console.error('Failed to edit comment', e); }
+  };
+
+  const labelColor = (color: string) => {
+    const map: Record<string, string> = { 
+      green:'bg-emerald-100 text-emerald-700 border-emerald-200', 
+      yellow:'bg-amber-100 text-amber-700 border-amber-200', 
+      orange:'bg-orange-100 text-orange-700 border-orange-200', 
+      red:'bg-red-100 text-red-700 border-red-200', 
+      purple:'bg-purple-100 text-purple-700 border-purple-200', 
+      blue:'bg-blue-100 text-blue-700 border-blue-200', 
+      sky:'bg-sky-100 text-sky-700 border-sky-200', 
+      lime:'bg-lime-100 text-lime-700 border-lime-200', 
+      pink:'bg-pink-100 text-pink-700 border-pink-200', 
+      black:'bg-slate-200 text-slate-700 border-slate-300' 
+    };
+    return map[color] || 'bg-slate-100 text-slate-600 border-slate-200';
   };
 
   useEffect(() => {
@@ -91,9 +205,9 @@ export default function ChecklistModal() {
     }
   };
 
-  const openCardInTrello = (cardUrl: string) => {
-    // Open in a new tab to maintain the checklist state in the current tab
-    window.open(cardUrl, '_blank');
+  const openCardInTrello = (cardId: string) => {
+    // Open internal modal instead of new tab
+    openCardModal(cardId);
   };
 
   const handleDragStart = (e: React.DragEvent, task: any) => { e.dataTransfer.setData('task', JSON.stringify(task)); };
@@ -229,7 +343,7 @@ export default function ChecklistModal() {
                     <div className="flex items-start gap-2">
                       <input type="checkbox" checked={task.state === 'complete'} onChange={() => handleCheck(task.id, task.cardId, task.state)} className="mt-1 w-4 h-4 accent-red-500 rounded cursor-pointer" />
                       <div className="flex-1 min-w-0">
-                        <button onClick={() => openCardInTrello(task.cardUrl)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-red-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
+                        <button onClick={() => openCardInTrello(task.cardId)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-red-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
                         <div className="flex items-center justify-between mt-1.5">
                           <div className="text-[11px] text-slate-500 truncate max-w-[140px]" title={task.cardName}>{task.cardName}</div>
                           {task.members && task.members.length > 0 && (
@@ -262,7 +376,7 @@ export default function ChecklistModal() {
                       <div className="flex items-start gap-2">
                         <input type="checkbox" checked={task.state === 'complete'} onChange={() => handleCheck(task.id, task.cardId, task.state)} className="mt-1 w-4 h-4 accent-sky-500 rounded cursor-pointer" />
                         <div className="flex-1 min-w-0">
-                          <button onClick={() => openCardInTrello(task.cardUrl)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-sky-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
+                          <button onClick={() => openCardInTrello(task.cardId)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-sky-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
                           <div className="flex items-center justify-between mt-1.5">
                             <div className="text-[11px] text-slate-500 truncate max-w-[140px]" title={task.cardName}>{task.cardName}</div>
                             {task.members && task.members.length > 0 && (
@@ -318,7 +432,7 @@ export default function ChecklistModal() {
                 <div className="text-[10px] text-slate-400 mb-1">{a.boardName}</div>
                 {a.cardName && (
                   <button 
-                    onClick={() => openCardInTrello(a.cardUrl)}
+                    onClick={() => openCardInTrello(a.cardId)}
                     className="text-[11px] text-slate-500 hover:text-blue-600 text-left w-full truncate flex items-center gap-1 mt-1 font-semibold transition-colors"
                   >
                     <Tag size={10} /> {a.cardName}
@@ -335,6 +449,189 @@ export default function ChecklistModal() {
           </div>
         </div>
       </div>
+
+      {/* Card Detail Modal Overlay */}
+      {selectedCardId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4" onClick={(e) => { if (e.target === e.currentTarget) setSelectedCardId(null); }}>
+          <div className="bg-white w-full max-w-2xl h-[85vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden relative border border-white/20">
+            <button onClick={() => setSelectedCardId(null)} className="absolute top-5 right-6 text-slate-400 hover:text-slate-800 transition-colors z-10 p-1 hover:bg-slate-100 rounded-full">
+              <X size={24} />
+            </button>
+            
+            {loadingCard ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500"></div>
+                <span className="text-sm text-slate-400 font-bold tracking-tight">카드 정보를 불러오는 중...</span>
+              </div>
+            ) : cardDetails ? (
+              <>
+                <div className="p-8 pb-6 border-b border-slate-100 bg-gradient-to-br from-white to-slate-50 shrink-0">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Tag size={14} className="text-sky-500" />
+                    <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest">Card Details</span>
+                  </div>
+                  <h2 className="text-2xl font-black text-slate-800 leading-tight pr-10">{cardDetails.name}</h2>
+                  
+                  {cardDetails.labels && cardDetails.labels.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-4">
+                      {cardDetails.labels.map((label: any) => (
+                        <span key={label.id} className={`text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm ${labelColor(label.color)}`}>
+                          {label.name || label.color}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {cardDetails.shortUrl && (
+                    <div className="mt-4">
+                      <a href={cardDetails.shortUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[12px] font-bold text-sky-500 hover:text-sky-700 transition-colors bg-sky-50 px-3 py-1.5 rounded-full border border-sky-100">
+                        <ExternalLink size={12} /> 트렐로 원본 보기
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar bg-[#fcfcfc]">
+                  {/* Description */}
+                  <section>
+                    <h3 className="text-[14px] font-black text-slate-700 flex items-center gap-2 mb-4 uppercase tracking-wider"><AlignLeft size={16} className="text-slate-400" /> 설명</h3>
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 text-[14px] text-slate-600 leading-relaxed shadow-sm relative">
+                      {cardDetails.desc ? (
+                        <>
+                          <div className={`overflow-hidden prose prose-sm max-w-none prose-slate transition-all duration-300 ${isDescriptionExpanded ? '' : 'line-clamp-6 max-h-[9rem]'}`}>
+                            <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{cardDetails.desc}</ReactMarkdown>
+                          </div>
+                          {cardDetails.desc.length > 200 && (
+                            <button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="mt-3 text-sky-500 font-black text-[12px] hover:text-sky-700 transition-colors flex items-center gap-1">
+                              {isDescriptionExpanded ? '간략히 보기' : '전체 보기...'}
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-slate-400 italic font-medium">설명이 비어있습니다.</span>
+                      )}
+                    </div>
+                  </section>
+
+                  {/* Attachments */}
+                  {cardDetails.attachments && cardDetails.attachments.length > 0 && (
+                    <section>
+                      <h3 className="text-[14px] font-black text-slate-700 flex items-center gap-2 mb-4 uppercase tracking-wider"><Paperclip size={16} className="text-slate-400" /> 첨부파일</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {cardDetails.attachments.slice().sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((att: any) => (
+                          <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-sky-300 hover:shadow-md transition-all group">
+                            <div className="w-10 h-10 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 group-hover:bg-sky-500 group-hover:text-white transition-colors">
+                              <Paperclip size={18} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[13px] font-bold text-slate-700 truncate group-hover:text-sky-600 transition-colors">{att.name}</div>
+                              <div className="text-[11px] text-slate-400 font-medium">파일 첨부됨</div>
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Checklists */}
+                  {cardDetails.checklists && cardDetails.checklists.length > 0 && (
+                    <section>
+                      <h3 className="text-[14px] font-black text-slate-700 flex items-center gap-2 mb-4 uppercase tracking-wider"><CheckSquare size={16} className="text-slate-400" /> 체크리스트</h3>
+                      <div className="space-y-6">
+                        {cardDetails.checklists.map((cl: any) => {
+                          const total = cl.checkItems.length;
+                          const completed = cl.checkItems.filter((i: any) => i.state === 'complete').length;
+                          const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+                          return (
+                            <div key={cl.id} className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-[14px] font-bold text-slate-700">{cl.name}</h4>
+                                <span className="text-[11px] font-black text-sky-500 bg-white px-2 py-0.5 rounded-full border border-sky-100">{percent}%</span>
+                              </div>
+                              <div className="h-2 w-full bg-slate-200 rounded-full mb-4 overflow-hidden border border-slate-300/30">
+                                <div className="h-full bg-sky-500 rounded-full transition-all duration-500 ease-out shadow-sm" style={{ width: `${percent}%` }}></div>
+                              </div>
+                              <div className="space-y-1">
+                                {cl.checkItems.map((item: any) => (
+                                  <div key={item.id} className={`group flex items-start gap-3 p-2 rounded-lg hover:bg-white hover:shadow-sm transition-all ${item.state === 'complete' ? 'opacity-50' : ''}`}>
+                                    <input type="checkbox" checked={item.state === 'complete'} onChange={() => handleCheck(item.id, cardDetails.id, item.state)} className="mt-1 w-4 h-4 accent-sky-500 rounded border-slate-300 cursor-pointer shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className={`text-[13.5px] leading-tight ${item.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700 font-bold'}`}>{item.name}</p>
+                                    </div>
+                                    <button onClick={() => handleDeleteCheckItem(cl.id, item.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all px-1.5" title="삭제"><X size={14}/></button>
+                                  </div>
+                                ))}
+                                {addingChecklistId === cl.id ? (
+                                  <div className="mt-3 p-3 bg-white rounded-xl border border-sky-200 shadow-sm flex flex-col gap-2">
+                                    <input autoFocus type="text" value={newCheckItemName} onChange={e => setNewCheckItemName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleAddCheckItem(cl.id); }} className="w-full text-[13px] px-3 py-2 border border-slate-200 rounded-lg focus:border-sky-400 outline-none transition-colors" placeholder="항목 내용을 입력하세요..." />
+                                    <div className="flex justify-end gap-2">
+                                      <button onClick={() => setAddingChecklistId(null)} className="text-[11px] px-3 py-1.5 text-slate-500 hover:bg-slate-100 rounded-lg font-bold transition-colors">취소</button>
+                                      <button onClick={() => handleAddCheckItem(cl.id)} className="text-[11px] px-4 py-1.5 bg-sky-500 text-white hover:bg-sky-600 rounded-lg font-bold shadow-sm transition-colors">추가하기</button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => { setAddingChecklistId(cl.id); setNewCheckItemName(''); }} className="w-full text-left px-3 py-2 mt-2 text-[12px] font-bold text-slate-400 hover:text-sky-600 hover:bg-white rounded-xl transition-all flex items-center gap-2"><Plus size={14} /> 항목 추가</button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Comments */}
+                  <section>
+                    <h3 className="text-[14px] font-black text-slate-700 flex items-center gap-2 mb-4 uppercase tracking-wider"><MessageSquare size={16} className="text-slate-400" /> 댓글</h3>
+                    <div className="flex flex-col gap-3 mb-6 relative">
+                      <textarea value={commentText} onChange={e => setCommentText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComment(); } }} className="w-full p-4 pr-14 text-[14px] border border-slate-200 rounded-2xl bg-white focus:outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-50 shadow-sm resize-none transition-all" placeholder="의견을 남겨보세요..." rows={2} />
+                      <button onClick={handleAddComment} disabled={!commentText.trim()} className="absolute right-3 bottom-3 p-2 bg-sky-500 text-white rounded-xl hover:bg-sky-600 disabled:opacity-30 disabled:bg-slate-300 transition-all shadow-md active:scale-95"><Send size={18} /></button>
+                    </div>
+                    <div className="space-y-4">
+                      {cardDetails.actions?.filter((a: any) => a.type === 'commentCard').map((comment: any) => (
+                        <div key={comment.id} className="flex gap-4">
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center font-black text-slate-500 text-[12px] shrink-0 uppercase border border-white shadow-sm">{comment.memberCreator.fullName.charAt(0)}</div>
+                          <div className="flex-1 bg-white p-4 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm hover:shadow-md transition-all">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[13px] font-black text-slate-700">{comment.memberCreator.fullName}</span>
+                                <span className="text-[11px] font-bold text-slate-300">{getTimeAgo(comment.date)}</span>
+                              </div>
+                              <button onClick={() => { setEditingCommentId(comment.id); setEditingCommentText(comment.data.text); }} className="text-[11px] font-bold text-slate-400 hover:text-sky-500 transition-colors">수정</button>
+                            </div>
+                            {editingCommentId === comment.id ? (
+                              <div className="mt-3 flex flex-col gap-2">
+                                <textarea autoFocus value={editingCommentText} onChange={e => setEditingCommentText(e.target.value)} className="w-full p-3 text-[13px] border border-sky-100 rounded-xl focus:border-sky-400 outline-none resize-none bg-sky-50/30" rows={2} />
+                                <div className="flex gap-2 justify-end">
+                                  <button onClick={() => setEditingCommentId(null)} className="text-[11px] font-bold px-3 py-1.5 text-slate-500 hover:bg-slate-100 rounded-lg">취소</button>
+                                  <button onClick={() => handleEditComment(comment.id)} className="text-[11px] font-bold px-4 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg shadow-sm">저장하기</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-[14px] text-slate-600 leading-relaxed prose prose-sm max-w-none prose-slate">
+                                <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{comment.data.text}</ReactMarkdown>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {(!cardDetails.actions || cardDetails.actions.filter((a: any) => a.type === 'commentCard').length === 0) && (
+                        <div className="text-[13px] text-slate-400 italic text-center py-10 bg-slate-50/50 rounded-2xl border border-slate-100 border-dashed">첫 번째 댓글을 남겨보세요.</div>
+                      )}
+                    </div>
+                  </section>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-10 text-center">
+                <Tag size={48} className="mb-4 opacity-10" />
+                <p className="font-bold">데이터를 불러오지 못했습니다.</p>
+                <button onClick={() => openCardModal(selectedCardId!)} className="mt-4 text-sky-500 font-bold hover:underline">다시 시도</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
