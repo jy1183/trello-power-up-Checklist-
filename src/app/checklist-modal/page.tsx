@@ -206,17 +206,19 @@ export default function ChecklistModal() {
   };
 
   const openCardInTrello = (cardUrl: string) => {
-    // Open in a small popup window to focus on the card and maintain checklist state
+    // Attempt to force a small popup window. 
+    // Modern browsers sometimes ignore these unless 'popup=yes' or specific features are used.
     const width = 850;
     const height = 950;
     const left = (window.screen.width - width) / 2;
     const top = (window.screen.height - height) / 2;
 
-    window.open(
-      cardUrl, 
-      'TrelloCardPopup', 
-      `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes`
-    );
+    const features = `width=${width},height=${height},left=${left},top=${top},popup=yes,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes`;
+    
+    const newWindow = window.open(cardUrl, '_blank', features);
+    if (newWindow) {
+      newWindow.focus();
+    }
   };
 
   const handleDragStart = (e: React.DragEvent, task: any) => { e.dataTransfer.setData('task', JSON.stringify(task)); };
