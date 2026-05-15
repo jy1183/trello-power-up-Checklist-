@@ -205,9 +205,18 @@ export default function ChecklistModal() {
     }
   };
 
-  const openCardInTrello = (cardId: string) => {
-    // Open internal modal instead of new tab
-    openCardModal(cardId);
+  const openCardInTrello = (cardUrl: string) => {
+    // Open in a small popup window to focus on the card and maintain checklist state
+    const width = 850;
+    const height = 950;
+    const left = (window.screen.width - width) / 2;
+    const top = (window.screen.height - height) / 2;
+
+    window.open(
+      cardUrl, 
+      'TrelloCardPopup', 
+      `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes`
+    );
   };
 
   const handleDragStart = (e: React.DragEvent, task: any) => { e.dataTransfer.setData('task', JSON.stringify(task)); };
@@ -343,7 +352,7 @@ export default function ChecklistModal() {
                     <div className="flex items-start gap-2">
                       <input type="checkbox" checked={task.state === 'complete'} onChange={() => handleCheck(task.id, task.cardId, task.state)} className="mt-1 w-4 h-4 accent-red-500 rounded cursor-pointer" />
                       <div className="flex-1 min-w-0">
-                        <button onClick={() => openCardInTrello(task.cardId)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-red-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
+                        <button onClick={() => openCardInTrello(task.cardUrl)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-red-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
                         <div className="flex items-center justify-between mt-1.5">
                           <div className="text-[11px] text-slate-500 truncate max-w-[140px]" title={task.cardName}>{task.cardName}</div>
                           {task.members && task.members.length > 0 && (
@@ -376,7 +385,7 @@ export default function ChecklistModal() {
                       <div className="flex items-start gap-2">
                         <input type="checkbox" checked={task.state === 'complete'} onChange={() => handleCheck(task.id, task.cardId, task.state)} className="mt-1 w-4 h-4 accent-sky-500 rounded cursor-pointer" />
                         <div className="flex-1 min-w-0">
-                          <button onClick={() => openCardInTrello(task.cardId)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-sky-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
+                          <button onClick={() => openCardInTrello(task.cardUrl)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-sky-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
                           <div className="flex items-center justify-between mt-1.5">
                             <div className="text-[11px] text-slate-500 truncate max-w-[140px]" title={task.cardName}>{task.cardName}</div>
                             {task.members && task.members.length > 0 && (
@@ -432,7 +441,7 @@ export default function ChecklistModal() {
                 <div className="text-[10px] text-slate-400 mb-1">{a.boardName}</div>
                 {a.cardName && (
                   <button 
-                    onClick={() => openCardInTrello(a.cardId)}
+                    onClick={() => openCardInTrello(a.cardUrl)}
                     className="text-[11px] text-slate-500 hover:text-blue-600 text-left w-full truncate flex items-center gap-1 mt-1 font-semibold transition-colors"
                   >
                     <Tag size={10} /> {a.cardName}
