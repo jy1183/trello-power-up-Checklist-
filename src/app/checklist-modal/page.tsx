@@ -509,7 +509,7 @@ export default function ChecklistModal() {
   });
 
   return (
-    <div className="w-full h-screen overflow-hidden flex flex-col bg-[#fcfbf7]">
+    <div className="w-full h-full overflow-hidden flex flex-col bg-[#fcfbf7]">
       <Script src="https://p.trellocdn.com/power-up.min.js" strategy="beforeInteractive" />
       <div className="p-4 border-b border-black/5 flex justify-between items-center bg-white/60 backdrop-blur-md shrink-0">
         <div className="flex items-center gap-4">
