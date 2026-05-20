@@ -508,63 +508,40 @@ export default function ChecklistModal() {
     return member;
   });
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      trello?.closeModal();
-    }
-  };
-
   return (
-    <div 
-      className="fixed inset-0 bg-black/60 z-0 flex items-center justify-center p-4 cursor-pointer" 
-      onClick={handleBackdropClick}
-    >
+    <div className="w-full h-screen overflow-hidden flex flex-col bg-[#fcfbf7]">
       <Script src="https://p.trellocdn.com/power-up.min.js" strategy="beforeInteractive" />
-      <div 
-        className="bg-[#fcfbf7] rounded-2xl shadow-2xl w-[70vw] h-[70vh] min-w-[900px] min-h-[600px] max-w-[95vw] max-h-[95vh] flex flex-col overflow-hidden relative z-10 cursor-default"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="p-4 border-b border-black/5 flex justify-between items-center bg-white/60 backdrop-blur-md shrink-0">
-          <div className="flex items-center gap-4">
-            <h2 className="text-[15px] font-extrabold text-slate-800 tracking-tight select-none">통합 체크리스트</h2>
-            <div className="h-4 w-px bg-slate-300 select-none"></div>
-            <div className="relative group">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-              <input 
-                type="text" 
-                placeholder="검색..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-4 py-1.5 bg-slate-100 hover:bg-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 border-none rounded-full text-xs w-[180px] transition-all outline-none"
-              />
-            </div>
-
-            {allMembers.length > 0 && (
-              <select 
-                value={selectedMemberId || ''} 
-                onChange={(e) => setSelectedMemberId(e.target.value || null)}
-                className="bg-slate-100 hover:bg-slate-200 py-1.5 px-4 rounded-full text-xs outline-none transition-all cursor-pointer font-bold text-slate-600 appearance-none border-none focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="">전체 멤버</option>
-                {allMembers.map((m: any) => (
-                  <option key={m.id} value={m.id}>{m.fullName}</option>
-                ))}
-              </select>
-            )}
-
-            <button className="text-xs bg-slate-200 hover:bg-slate-300 px-4 py-1.5 rounded-full text-slate-600 font-bold transition-all flex items-center gap-1.5 cursor-pointer" onClick={() => { fetchTodos(); handleRefreshActivity(); }} disabled={loadingTodos}>
-              <RefreshCw size={13} className={loadingTodos ? 'animate-spin' : ''} /> {loadingTodos ? '로딩 중' : '새로고침'}
-            </button>
+      <div className="p-4 border-b border-black/5 flex justify-between items-center bg-white/60 backdrop-blur-md shrink-0">
+        <div className="flex items-center gap-4">
+          <div className="relative group">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+            <input 
+              type="text" 
+              placeholder="검색..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-4 py-1.5 bg-slate-100 hover:bg-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 border-none rounded-full text-sm w-[180px] transition-all outline-none"
+            />
           </div>
-          <button 
-            type="button"
-            onClick={() => trello?.closeModal()} 
-            className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-full transition-all cursor-pointer outline-none" 
-            title="닫기"
-          >
-            <X size={18} />
+
+          {allMembers.length > 0 && (
+            <select 
+              value={selectedMemberId || ''} 
+              onChange={(e) => setSelectedMemberId(e.target.value || null)}
+              className="bg-slate-100 hover:bg-slate-200 py-1.5 px-4 rounded-full text-sm outline-none transition-all cursor-pointer font-medium text-slate-600 appearance-none border-none focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">전체 멤버</option>
+              {allMembers.map((m: any) => (
+                <option key={m.id} value={m.id}>{m.fullName}</option>
+              ))}
+            </select>
+          )}
+
+          <button className="text-xs bg-slate-200 hover:bg-slate-300 px-4 py-1.5 rounded-full text-slate-600 font-bold transition-all flex items-center gap-1.5" onClick={() => { fetchTodos(); handleRefreshActivity(); }} disabled={loadingTodos}>
+            <RefreshCw size={13} className={loadingTodos ? 'animate-spin' : ''} /> {loadingTodos ? '로딩 중' : '새로고침'}
           </button>
         </div>
+      </div>
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 overflow-x-auto overflow-y-hidden p-5 bg-[#f6f5f0] relative min-w-0 custom-scrollbar">
         <div className={`flex gap-4 h-full transition-opacity duration-300 ${loadingTodos ? 'opacity-40' : 'opacity-100'}`} style={{ width: 'max-content' }}>
@@ -861,7 +838,6 @@ export default function ChecklistModal() {
           </div>
         </div>
       )}
-      </div>
     </div>
   );
 }
