@@ -27,7 +27,7 @@ export async function GET(request: Request) {
         }
 
         const promises = targetBoardIds.map(id => 
-            axios.get(`https://api.trello.com/1/boards/${id}/actions?key=${TRELLO_API_KEY}&token=${TRELLO_API_TOKEN}&limit=${limit}&fields=id,type,date,data,memberCreator&member_fields=fullName,username,avatarUrl&filter=all`)
+            axios.get(`https://api.trello.com/1/boards/${id}/actions?key=${TRELLO_API_KEY}&token=${TRELLO_API_TOKEN}&limit=${limit}&fields=id,type,date,data,memberCreator&member_fields=fullName,username,avatarUrl&filter=commentCard,createCard,updateCheckItemStateOnCard`)
                 .catch(e => { console.error(`Error fetching activity for board ${id}:`, e.message); return { data: [] }; })
         );
 
@@ -37,22 +37,28 @@ export async function GET(request: Request) {
         results.forEach(res => {
             if (res.data && Array.isArray(res.data)) {
                 res.data.forEach((a: any) => {
-                    allActions.push({
-                        id: a.id,
-                        type: a.type,
-                        date: a.date,
-                        memberName: a.memberCreator?.fullName || a.memberCreator?.username || '',
-                        cardName: a.data?.card?.name || '',
-                        cardUrl: a.data?.card?.shortLink ? `https://trello.com/c/${a.data.card.shortLink}` : '',
-                        cardId: a.data?.card?.shortLink || a.data?.card?.id || '',
-                        listName: a.data?.list?.name || '',
-                        listBefore: a.data?.listBefore?.name || '',
-                        listAfter: a.data?.listAfter?.name || '',
-                        text: a.data?.text || '',
-                        boardName: a.data?.board?.name || '',
-                        checkItem: a.data?.checkItem?.name || '',
-                        checkItemState: a.data?.checkItem?.state || '',
-                    });
+                    const isComment = a.type === 'commentCard';
+                    const isCreateCard = a.type === 'createCard';
+                    const isCheckComplete = a.type === 'updateCheckItemStateOnCard' && a.data?.checkItem?.state === 'complete';
+
+                    if (isComment || isCreateCard || isCheckComplete) {
+                        allActions.push({
+                            id: a.id,
+                            type: a.type,
+                            date: a.date,
+                            memberName: a.memberCreator?.fullName || a.memberCreator?.username || '',
+                            cardName: a.data?.card?.name || '',
+                            cardUrl: a.data?.card?.shortLink ? `https://trello.com/c/${a.data.card.shortLink}` : '',
+                            cardId: a.data?.card?.shortLink || a.data?.card?.id || '',
+                            listName: a.data?.list?.name || '',
+                            listBefore: a.data?.listBefore?.name || '',
+                            listAfter: a.data?.listAfter?.name || '',
+                            text: a.data?.text || '',
+                            boardName: a.data?.board?.name || '',
+                            checkItem: a.data?.checkItem?.name || '',
+                            checkItemState: a.data?.checkItem?.state || '',
+                        });
+                    }
                 });
             }
         });
