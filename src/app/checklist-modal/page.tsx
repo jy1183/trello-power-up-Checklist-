@@ -353,6 +353,11 @@ export default function ChecklistModal() {
       if ((window as any).TrelloPowerUp) {
         const t = (window as any).TrelloPowerUp.iframe();
         setTrello(t);
+        try {
+          t.updateModal({ fullscreen: true });
+        } catch (e) {
+          console.error('Failed to force fullscreen modal:', e);
+        }
         // By default, fetch integrated activity from all boards
         fetchActivity();
       }
