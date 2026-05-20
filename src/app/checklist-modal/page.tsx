@@ -440,46 +440,46 @@ export default function ChecklistModal() {
         </div>
         
         {/* Activity Panel */}
-        <div className="w-[280px] shrink-0 border-l border-slate-200 bg-slate-50 flex flex-col">
+        <div className="w-[336px] shrink-0 border-l border-slate-200 bg-slate-50 flex flex-col">
           <div className="py-2.5 px-3 border-b bg-slate-200/80 border-slate-200 flex items-center justify-between">
-            <h3 className="text-[15px] font-bold text-slate-700 flex items-center gap-1.5"><Clock size={14} /> 통합 Activity</h3>
+            <h3 className="text-[17px] font-bold text-slate-700 flex items-center gap-1.5"><Clock size={16} /> 통합 Activity</h3>
             <button onClick={handleRefreshActivity} className="text-slate-400 hover:text-sky-500 transition-colors" title="새로고침">
-              <RefreshCw size={12} className={loadingActivity ? 'animate-spin' : ''} />
+              <RefreshCw size={14} className={loadingActivity ? 'animate-spin' : ''} />
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar relative">
             {loadingActivity && activityData.length === 0 ? (
               <div className="absolute inset-0 flex items-center justify-center bg-white/50"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-slate-400"></div></div>
             ) : activityData.length === 0 ? (
-              <div className="text-center text-slate-400 text-xs py-10">최근 활동 내역이 없습니다.</div>
+              <div className="text-center text-slate-400 text-[14px] py-10">최근 활동 내역이 없습니다.</div>
             ) : (
               <>
                 {activityData.map((a) => (
                   <div key={a.id} className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm transition-hover hover:border-slate-300">
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 overflow-hidden">
+                        <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[12px] font-bold text-slate-600 overflow-hidden">
                           {a.memberName ? a.memberName.charAt(0).toUpperCase() : '?'}
                         </div>
-                        <span className="text-[12px] font-bold text-slate-700">{a.memberName}</span>
+                        <span className="text-[14px] font-bold text-slate-700">{a.memberName}</span>
                       </div>
-                      <div className="text-[10px] text-slate-400 font-medium">
+                      <div className="text-[12px] text-slate-400 font-medium">
                         {getTimeAgo(a.date)}
                       </div>
                     </div>
-                    <div className="text-[12px] text-sky-600 font-medium mb-1">{getActivityText(a)}</div>
-                    <div className="text-[10px] text-slate-400 mb-1">{a.boardName}</div>
+                    <div className="text-[14px] text-sky-600 font-medium mb-1">{getActivityText(a)}</div>
+                    <div className="text-[12px] text-slate-400 mb-1">{a.boardName}</div>
                     {a.cardName && (
                       <button 
                         onClick={() => openCardInTrello(a.cardUrl)}
-                        className="text-[11px] text-slate-500 hover:text-blue-600 text-left w-full truncate flex items-center gap-1 mt-1 font-semibold transition-colors"
+                        className="text-[13px] text-slate-500 hover:text-blue-600 text-left w-full truncate flex items-center gap-1 mt-1 font-semibold transition-colors"
                       >
-                        <Tag size={10} /> {a.cardName}
+                        <Tag size={12} /> {a.cardName}
                       </button>
                     )}
                     {a.text && (
-                      <div className="text-[11px] text-slate-500 mt-1.5 bg-slate-50 p-2 rounded border border-slate-100 flex items-start gap-1">
-                        <MessageSquare size={10} className="mt-0.5 shrink-0 text-slate-400" />
+                      <div className="text-[13px] text-slate-500 mt-1.5 bg-slate-50 p-2 rounded border border-slate-100 flex items-start gap-1">
+                        <MessageSquare size={12} className="mt-0.5 shrink-0 text-slate-400" />
                         <span className="italic whitespace-pre-wrap break-all w-full leading-normal">{a.text}</span>
                       </div>
                     )}
@@ -490,11 +490,11 @@ export default function ChecklistModal() {
                     <button 
                       onClick={handleLoadMoreActivity}
                       disabled={loadingMoreActivity}
-                      className="w-full py-2 bg-white hover:bg-slate-50 text-slate-500 hover:text-sky-600 border border-slate-200 hover:border-sky-200 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 disabled:opacity-60 cursor-pointer outline-none"
+                      className="w-full py-2 bg-white hover:bg-slate-50 text-slate-500 hover:text-sky-600 border border-slate-200 hover:border-sky-200 rounded-lg text-[14px] font-bold transition-all flex items-center justify-center gap-1.5 disabled:opacity-60 cursor-pointer outline-none"
                     >
                       {loadingMoreActivity ? (
                         <>
-                          <RefreshCw size={12} className="animate-spin text-sky-500" />
+                          <RefreshCw size={14} className="animate-spin text-sky-500" />
                           불러오는 중...
                         </>
                       ) : (
