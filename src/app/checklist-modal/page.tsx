@@ -80,11 +80,21 @@ export default function ChecklistModal() {
     setAddModalCards([]);
     
     const board = addModalBoards.find(b => b.id === boardId);
+    let boardUrl = '';
     if (board) {
+      boardUrl = board.url;
       setSelectedAddBoardUrl(board.url);
     }
 
-    if (!boardId || cardAddMode === 'new') return;
+    if (!boardId) return;
+
+    if (cardAddMode === 'new') {
+      if (boardUrl) {
+        openCardInTrello(boardUrl);
+      }
+      setIsAddModalOpen(false);
+      return;
+    }
 
     setLoadingAddModalData(true);
     try {
@@ -123,6 +133,13 @@ export default function ChecklistModal() {
 
   const handleModeChange = async (mode: 'existing' | 'new') => {
     setCardAddMode(mode);
+    if (mode === 'new') {
+      if (selectedAddBoardUrl) {
+        openCardInTrello(selectedAddBoardUrl);
+      }
+      setIsAddModalOpen(false);
+      return;
+    }
     if (mode === 'existing' && selectedAddBoardId && addModalLists.length === 0) {
       setLoadingAddModalData(true);
       try {
@@ -691,19 +708,6 @@ export default function ChecklistModal() {
 
             {/* Form Content */}
             <form onSubmit={handleAddChecklistSubmit} className="p-5 space-y-4 overflow-y-auto max-h-[70vh] custom-scrollbar">
-              {/* Item Name */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-600">할 일 이름</label>
-                <input 
-                  type="text" 
-                  required
-                  placeholder="해야 할 체크리스트 항목명을 입력하세요" 
-                  value={addModalItemName}
-                  onChange={(e) => setAddModalItemName(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-sm transition-all outline-none focus:ring-2 focus:ring-sky-100 font-medium"
-                />
-              </div>
-
               {/* Select Board */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-600">보드 선택</label>
@@ -779,18 +783,27 @@ export default function ChecklistModal() {
                       ))}
                     </select>
                   </div>
+
+                  {/* Item Name (할 일 이름) */}
+                  {selectedAddCardId && (
+                    <div className="space-y-1.5 pt-3 border-t border-dashed border-slate-100">
+                      <label className="block text-xs font-bold text-slate-600">할 일 이름</label>
+                      <input 
+                        type="text" 
+                        required
+                        placeholder="해야 할 체크리스트 항목명을 입력하세요" 
+                        value={addModalItemName}
+                        onChange={(e) => setAddModalItemName(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-sm transition-all outline-none focus:ring-2 focus:ring-sky-100 font-medium"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
               {selectedAddBoardId && cardAddMode === 'new' && (
                 <div className="p-3 bg-sky-50 border border-sky-100 rounded-xl text-sky-700 text-xs font-medium leading-relaxed">
                   💡 <strong>'보드로 이동'</strong>을 누르면 새 창에서 해당 Trello 보드가 열립니다. 보드에서 카드를 자유롭게 생성하고 체크리스트 항목을 관리하실 수 있습니다.
-                </div>
-              )}
-
-              {loadingAddModalData && (
-                <div className="flex items-center justify-center gap-1.5 py-1 text-xs font-bold text-sky-600">
-                  <RefreshCw size={12} className="animate-spin" /> 데이터를 불러오는 중...
                 </div>
               )}
             </form>

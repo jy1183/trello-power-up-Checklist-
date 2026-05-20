@@ -24,9 +24,10 @@ export async function GET(request: Request) {
             if (!TRELLO_WORKSPACE_ID) {
                 return NextResponse.json({ error: 'Trello workspace ID not configured' }, { status: 500 });
             }
-            const url = `https://api.trello.com/1/organizations/${TRELLO_WORKSPACE_ID}/boards?key=${TRELLO_API_KEY}&token=${TRELLO_API_TOKEN}&fields=id,name,url`;
+            const url = `https://api.trello.com/1/organizations/${TRELLO_WORKSPACE_ID}/boards?key=${TRELLO_API_KEY}&token=${TRELLO_API_TOKEN}&fields=id,name,url,closed`;
             const res = await axios.get(url);
-            return NextResponse.json({ boards: res.data });
+            const activeBoards = res.data.filter((b: any) => !b.closed);
+            return NextResponse.json({ boards: activeBoards });
         }
     } catch (error: any) {
         console.error('Error fetching Trello boards/lists:', error);
