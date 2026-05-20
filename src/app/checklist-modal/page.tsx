@@ -32,6 +32,163 @@ export default function ChecklistModal() {
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState('');
 
+  // New Checklist Item Modal states
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addModalDayOffset, setAddModalDayOffset] = useState<number | null>(null);
+  const [addModalItemName, setAddModalItemName] = useState('');
+  const [addModalBoards, setAddModalBoards] = useState<any[]>([]);
+  const [selectedAddBoardId, setSelectedAddBoardId] = useState('');
+  const [selectedAddBoardUrl, setSelectedAddBoardUrl] = useState('');
+  const [cardAddMode, setCardAddMode] = useState<'existing' | 'new'>('existing');
+  const [addModalLists, setAddModalLists] = useState<any[]>([]);
+  const [selectedAddListId, setSelectedAddListId] = useState('');
+  const [addModalCards, setAddModalCards] = useState<any[]>([]);
+  const [selectedAddCardId, setSelectedAddCardId] = useState('');
+  const [submittingChecklist, setSubmittingChecklist] = useState(false);
+  const [loadingAddModalData, setLoadingAddModalData] = useState(false);
+
+  const openAddModal = async (dayOffset: number) => {
+    setAddModalDayOffset(dayOffset);
+    setIsAddModalOpen(true);
+    setAddModalItemName('');
+    setSelectedAddBoardId('');
+    setSelectedAddBoardUrl('');
+    setCardAddMode('existing');
+    setAddModalLists([]);
+    setSelectedAddListId('');
+    setAddModalCards([]);
+    setSelectedAddCardId('');
+    setLoadingAddModalData(true);
+    try {
+      const res = await fetch('/api/trello/boards');
+      const data = await res.json();
+      if (data.boards) {
+        setAddModalBoards(data.boards);
+      }
+    } catch (e) {
+      console.error('Failed to fetch boards:', e);
+    } finally {
+      setLoadingAddModalData(false);
+    }
+  };
+
+  const handleAddBoardChange = async (boardId: string) => {
+    setSelectedAddBoardId(boardId);
+    setSelectedAddListId('');
+    setSelectedAddCardId('');
+    setAddModalLists([]);
+    setAddModalCards([]);
+    
+    const board = addModalBoards.find(b => b.id === boardId);
+    if (board) {
+      setSelectedAddBoardUrl(board.url);
+    }
+
+    if (!boardId || cardAddMode === 'new') return;
+
+    setLoadingAddModalData(true);
+    try {
+      const res = await fetch(`/api/trello/boards?boardId=${boardId}`);
+      const data = await res.json();
+      if (data.lists) {
+        setAddModalLists(data.lists);
+      }
+    } catch (e) {
+      console.error('Failed to fetch lists:', e);
+    } finally {
+      setLoadingAddModalData(false);
+    }
+  };
+
+  const handleAddListChange = async (listId: string) => {
+    setSelectedAddListId(listId);
+    setSelectedAddCardId('');
+    setAddModalCards([]);
+
+    if (!listId) return;
+
+    setLoadingAddModalData(true);
+    try {
+      const res = await fetch(`/api/trello/lists?listId=${listId}`);
+      const data = await res.json();
+      if (data.cards) {
+        setAddModalCards(data.cards);
+      }
+    } catch (e) {
+      console.error('Failed to fetch cards:', e);
+    } finally {
+      setLoadingAddModalData(false);
+    }
+  };
+
+  const handleModeChange = async (mode: 'existing' | 'new') => {
+    setCardAddMode(mode);
+    if (mode === 'existing' && selectedAddBoardId && addModalLists.length === 0) {
+      setLoadingAddModalData(true);
+      try {
+        const res = await fetch(`/api/trello/boards?boardId=${selectedAddBoardId}`);
+        const data = await res.json();
+        if (data.lists) {
+          setAddModalLists(data.lists);
+        }
+      } catch (e) {
+        console.error('Failed to fetch lists:', e);
+      } finally {
+        setLoadingAddModalData(false);
+      }
+    }
+  };
+
+  const handleAddChecklistSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addModalItemName.trim() || !selectedAddBoardId) return;
+
+    if (cardAddMode === 'new') {
+      if (selectedAddBoardUrl) {
+        openCardInTrello(selectedAddBoardUrl);
+      }
+      setIsAddModalOpen(false);
+      return;
+    }
+
+    if (!selectedAddCardId) return;
+
+    setSubmittingChecklist(true);
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const targetDate = new Date(today);
+      if (addModalDayOffset !== null) {
+        targetDate.setDate(today.getDate() + addModalDayOffset);
+      }
+      targetDate.setHours(12, 0, 0, 0);
+      const dueIso = targetDate.toISOString();
+
+      const res = await fetch('/api/trello/checklists/item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cardId: selectedAddCardId,
+          name: addModalItemName.trim(),
+          due: dueIso
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setIsAddModalOpen(false);
+        fetchTodos();
+        fetchActivity();
+      } else {
+        alert('추가 실패: ' + (data.details || data.error));
+      }
+    } catch (err: any) {
+      console.error('Error submitting checklist item:', err);
+      alert('에러 발생: ' + err.message);
+    } finally {
+      setSubmittingChecklist(false);
+    }
+  };
+
 
 
   const fetchActivity = async (boardId?: string, customLimit?: number, isMore = false) => {
@@ -407,9 +564,9 @@ export default function ChecklistModal() {
             return (
               <div key={dayOffset} className={`flex flex-col h-full rounded-xl border w-[260px] shrink-0 ${isToday ? 'bg-sky-50/30 border-sky-200' : 'bg-white/40 border-slate-100'} overflow-hidden`} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, dayOffset)}>
                 <div className={`py-2.5 px-3 text-center text-sm font-bold border-b ${isToday ? 'bg-sky-100/50 text-sky-700 border-sky-200' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>{getDayName(dayOffset)} ({dayTasks.length})</div>
-                <div className="flex-1 p-2 space-y-2 overflow-y-auto custom-scrollbar">
+                <div className="flex-1 p-2 space-y-2 overflow-y-auto custom-scrollbar" onDoubleClick={() => openAddModal(dayOffset)}>
                   {dayTasks.map(task => (
-                    <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task)} className={`p-2.5 rounded-lg border shadow-sm transition-all cursor-move ${task.state === 'complete' ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-slate-200 hover:border-sky-300'}`}>
+                    <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task)} onDoubleClick={(e) => e.stopPropagation()} className={`p-2.5 rounded-lg border shadow-sm transition-all cursor-move ${task.state === 'complete' ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-slate-200 hover:border-sky-300'}`}>
                       <div className="flex items-start gap-2">
                         <input type="checkbox" checked={task.state === 'complete'} onChange={() => handleCheck(task.id, task.cardId, task.state)} className="mt-1 w-4 h-4 accent-sky-500 rounded cursor-pointer" />
                         <div className="flex-1 min-w-0">
@@ -430,7 +587,7 @@ export default function ChecklistModal() {
                       </div>
                     </div>
                   ))}
-                  {dayTasks.length === 0 && <div className="text-center text-slate-400 text-xs py-4 flex items-center justify-center h-full opacity-50 border-2 border-dashed border-transparent hover:border-slate-300 rounded-lg">가져다 놓기</div>}
+                  {dayTasks.length === 0 && <div className="text-center text-slate-400 text-xs py-4 flex items-center justify-center h-full opacity-50 border-2 border-dashed border-slate-200 hover:border-slate-300 rounded-lg cursor-pointer" onDoubleClick={() => openAddModal(dayOffset)}>가져다 놓기 (더블클릭하여 추가)</div>}
                 </div>
               </div>
             );
@@ -509,6 +666,165 @@ export default function ChecklistModal() {
         </div>
       </div>
 
+      {/* Add Checklist Item Modal Popup */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden flex flex-col transition-all transform scale-100">
+            {/* Header */}
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="text-base font-bold text-slate-800">신규 체크리스트 추가</h3>
+                {addModalDayOffset !== null && (
+                  <p className="text-xs text-sky-600 font-semibold mt-0.5">
+                    목표 날짜: {getDayName(addModalDayOffset)}
+                  </p>
+                )}
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-full transition-all"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Form Content */}
+            <form onSubmit={handleAddChecklistSubmit} className="p-5 space-y-4 overflow-y-auto max-h-[70vh] custom-scrollbar">
+              {/* Item Name */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-600">할 일 이름</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="해야 할 체크리스트 항목명을 입력하세요" 
+                  value={addModalItemName}
+                  onChange={(e) => setAddModalItemName(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-sm transition-all outline-none focus:ring-2 focus:ring-sky-100 font-medium"
+                />
+              </div>
+
+              {/* Select Board */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-600">보드 선택</label>
+                <select 
+                  required
+                  value={selectedAddBoardId}
+                  onChange={(e) => handleAddBoardChange(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-sm transition-all outline-none cursor-pointer font-medium"
+                >
+                  <option value="">보드를 선택하세요</option>
+                  {addModalBoards.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Card Mode Selection */}
+              {selectedAddBoardId && (
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-600">카드 추가 방식</label>
+                  <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => handleModeChange('existing')}
+                      className={`py-1.5 text-xs font-bold rounded-lg transition-all ${cardAddMode === 'existing' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                    >
+                      기존 카드 선택
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleModeChange('new')}
+                      className={`py-1.5 text-xs font-bold rounded-lg transition-all ${cardAddMode === 'new' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                    >
+                      신규 카드 생성
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Mode-specific Fields */}
+              {selectedAddBoardId && cardAddMode === 'existing' && (
+                <div className="space-y-3 pt-1 border-t border-dashed border-slate-100">
+                  {/* Select List */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-600">리스트 선택</label>
+                    <select 
+                      required
+                      value={selectedAddListId}
+                      onChange={(e) => handleAddListChange(e.target.value)}
+                      disabled={addModalLists.length === 0}
+                      className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-sm transition-all outline-none cursor-pointer font-medium disabled:opacity-60"
+                    >
+                      <option value="">리스트를 선택하세요</option>
+                      {addModalLists.map((l) => (
+                        <option key={l.id} value={l.id}>{l.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Select Card */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-600">카드 선택</label>
+                    <select 
+                      required
+                      value={selectedAddCardId}
+                      onChange={(e) => setSelectedAddCardId(e.target.value)}
+                      disabled={addModalCards.length === 0}
+                      className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-sm transition-all outline-none cursor-pointer font-medium disabled:opacity-60"
+                    >
+                      <option value="">카드를 선택하세요</option>
+                      {addModalCards.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {selectedAddBoardId && cardAddMode === 'new' && (
+                <div className="p-3 bg-sky-50 border border-sky-100 rounded-xl text-sky-700 text-xs font-medium leading-relaxed">
+                  💡 <strong>'보드로 이동'</strong>을 누르면 새 창에서 해당 Trello 보드가 열립니다. 보드에서 카드를 자유롭게 생성하고 체크리스트 항목을 관리하실 수 있습니다.
+                </div>
+              )}
+
+              {loadingAddModalData && (
+                <div className="flex items-center justify-center gap-1.5 py-1 text-xs font-bold text-sky-600">
+                  <RefreshCw size={12} className="animate-spin" /> 데이터를 불러오는 중...
+                </div>
+              )}
+            </form>
+
+            {/* Footer Buttons */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="px-4 py-2 hover:bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg transition-all"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleAddChecklistSubmit}
+                disabled={submittingChecklist || loadingAddModalData || !addModalItemName.trim() || !selectedAddBoardId || (cardAddMode === 'existing' && !selectedAddCardId)}
+                className="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-slate-200 text-white disabled:text-slate-400 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm disabled:shadow-none"
+              >
+                {submittingChecklist ? (
+                  <>
+                    <RefreshCw size={12} className="animate-spin" />
+                    저장 중
+                  </>
+                ) : cardAddMode === 'new' ? (
+                  '보드로 이동'
+                ) : (
+                  '추가하기'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
