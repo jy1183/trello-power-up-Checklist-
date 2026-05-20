@@ -305,37 +305,33 @@ export default function ChecklistModal() {
   });
 
   return (
-    <div className="w-screen h-screen overflow-hidden flex flex-col bg-[#fcfbf7]">
+    <div className="w-full h-full overflow-hidden flex flex-col bg-[#fcfbf7]">
       <Script src="https://p.trellocdn.com/power-up.min.js" strategy="beforeInteractive" />
       <div className="p-4 border-b border-black/5 flex justify-between items-center bg-white/60 backdrop-blur-md shrink-0">
-        <div className="flex items-center gap-6">
-          <h2 className="text-xl font-bold text-slate-700 tracking-tight flex items-center gap-2"><CheckSquare size={20} className="text-blue-500" /> 통합 체크리스트</h2>
-          
-          <div className="flex items-center gap-2">
-            <div className="relative group">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-              <input 
-                type="text" 
-                placeholder="검색..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-4 py-1.5 bg-slate-100 hover:bg-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 border-none rounded-full text-sm w-[180px] transition-all outline-none"
-              />
-            </div>
-
-            {allMembers.length > 0 && (
-              <select 
-                value={selectedMemberId || ''} 
-                onChange={(e) => setSelectedMemberId(e.target.value || null)}
-                className="bg-slate-100 hover:bg-slate-200 py-1.5 px-4 rounded-full text-sm outline-none transition-all cursor-pointer font-medium text-slate-600 appearance-none border-none focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="">전체 멤버</option>
-                {allMembers.map((m: any) => (
-                  <option key={m.id} value={m.id}>{m.fullName}</option>
-                ))}
-              </select>
-            )}
+        <div className="flex items-center gap-4">
+          <div className="relative group">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+            <input 
+              type="text" 
+              placeholder="검색..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-4 py-1.5 bg-slate-100 hover:bg-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 border-none rounded-full text-sm w-[180px] transition-all outline-none"
+            />
           </div>
+
+          {allMembers.length > 0 && (
+            <select 
+              value={selectedMemberId || ''} 
+              onChange={(e) => setSelectedMemberId(e.target.value || null)}
+              className="bg-slate-100 hover:bg-slate-200 py-1.5 px-4 rounded-full text-sm outline-none transition-all cursor-pointer font-medium text-slate-600 appearance-none border-none focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">전체 멤버</option>
+              {allMembers.map((m: any) => (
+                <option key={m.id} value={m.id}>{m.fullName}</option>
+              ))}
+            </select>
+          )}
 
           <button className="text-xs bg-slate-200 hover:bg-slate-300 px-4 py-1.5 rounded-full text-slate-600 font-bold transition-all flex items-center gap-1.5" onClick={() => { fetchTodos(); fetchActivity(); }} disabled={loadingTodos}>
             <RefreshCw size={13} className={loadingTodos ? 'animate-spin' : ''} /> {loadingTodos ? '로딩 중' : '새로고침'}
