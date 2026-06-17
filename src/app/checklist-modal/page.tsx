@@ -530,16 +530,34 @@ export default function ChecklistModal() {
           </div>
 
           {allMembers.length > 0 && (
-            <select 
-              value={selectedMemberId || ''} 
-              onChange={(e) => setSelectedMemberId(e.target.value || null)}
-              className="bg-slate-100 hover:bg-slate-200 py-1.5 px-4 rounded-full text-sm outline-none transition-all cursor-pointer font-medium text-slate-600 appearance-none border-none focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="">전체 멤버</option>
-              {allMembers.map((m: any) => (
-                <option key={m.id} value={m.id}>{m.fullName}</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-1.5 bg-slate-100/60 p-1.5 rounded-full border border-black/5 shadow-inner">
+              <button
+                onClick={() => setSelectedMemberId(null)}
+                className={`w-7 h-7 rounded-full text-[10px] font-extrabold transition-all border flex items-center justify-center shrink-0 shadow-sm ${!selectedMemberId ? 'bg-sky-500 border-sky-600 text-white shadow-sm ring-2 ring-sky-100' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+              >
+                ALL
+              </button>
+              <div className="flex items-center gap-1 overflow-x-auto max-w-[400px] no-scrollbar">
+                {allMembers.map((m: any) => {
+                  if (!m) return null;
+                  const isSelected = selectedMemberId === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => setSelectedMemberId(isSelected ? null : m.id)}
+                      className={`w-7 h-7 rounded-full border flex items-center justify-center text-[9px] font-bold overflow-hidden transition-all shrink-0 hover:scale-105 active:scale-95 ${isSelected ? 'border-sky-500 ring-2 ring-sky-100 scale-105 shadow-sm bg-white' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                      title={m.fullName}
+                    >
+                      {m.avatarUrl ? (
+                        <img src={`${m.avatarUrl}/30.png`} alt={m.fullName} className="w-full h-full object-cover" />
+                      ) : (
+                        m.fullName.charAt(0)
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           <button className="text-xs bg-slate-200 hover:bg-slate-300 px-4 py-1.5 rounded-full text-slate-600 font-bold transition-all flex items-center gap-1.5" onClick={() => { fetchTodos(); handleRefreshActivity(); }} disabled={loadingTodos}>
@@ -558,21 +576,21 @@ export default function ChecklistModal() {
                   <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task)} className={`p-2.5 rounded-lg border shadow-sm transition-all cursor-move ${task.state === 'complete' ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-red-200 hover:border-red-300'}`}>
                     <div className="flex items-start gap-2">
                       <input type="checkbox" checked={task.state === 'complete'} onChange={() => handleCheck(task.id, task.cardId, task.state)} className="mt-1 w-4 h-4 accent-red-500 rounded cursor-pointer" />
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 relative pb-5">
                         <button onClick={() => openCardInTrello(task.cardUrl)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-red-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
-                        <div className="flex items-center justify-between mt-1.5">
-                          <div className="text-[11px] text-slate-500 truncate max-w-[140px]" title={task.cardName}>{task.cardName}</div>
-                          {task.members && task.members.length > 0 && (
-                            <div className="flex -space-x-1.5">
-                              {task.members.map((m: any) => (
-                                <div key={m.id} className="w-5 h-5 rounded-full border border-white bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 overflow-hidden" title={m.fullName}>
-                                  {m.avatarUrl ? <img src={`${m.avatarUrl}/30.png`} alt={m.fullName} className="w-full h-full object-cover" /> : m.fullName.charAt(0)}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                        <div className="text-[11px] text-slate-500 truncate max-w-[170px] mt-1" title={task.cardName}>{task.cardName}</div>
                         {task.due && <div className="text-[10px] text-red-500 mt-1 font-semibold">{new Date(task.due).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</div>}
+                        
+                        {/* 오른쪽 아래에 해당 체크리스트 담당자 아이콘 표시 */}
+                        {task.members && task.members.length > 0 && (
+                          <div className="absolute right-0 bottom-0 flex">
+                            {task.members.map((m: any) => (
+                              <div key={m.id} className="w-5 h-5 rounded-full border border-white bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 overflow-hidden shadow-sm" title={m.fullName}>
+                                {m.avatarUrl ? <img src={`${m.avatarUrl}/30.png`} alt={m.fullName} className="w-full h-full object-cover" /> : m.fullName.charAt(0)}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -591,20 +609,20 @@ export default function ChecklistModal() {
                     <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task)} onDoubleClick={(e) => e.stopPropagation()} className={`p-2.5 rounded-lg border shadow-sm transition-all cursor-move ${task.state === 'complete' ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-slate-200 hover:border-sky-300'}`}>
                       <div className="flex items-start gap-2">
                         <input type="checkbox" checked={task.state === 'complete'} onChange={() => handleCheck(task.id, task.cardId, task.state)} className="mt-1 w-4 h-4 accent-sky-500 rounded cursor-pointer" />
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 relative pb-5">
                           <button onClick={() => openCardInTrello(task.cardUrl)} className={`block text-left w-full text-[13px] font-bold leading-tight hover:text-sky-600 transition-colors ${task.state === 'complete' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</button>
-                          <div className="flex items-center justify-between mt-1.5">
-                            <div className="text-[11px] text-slate-500 truncate max-w-[140px]" title={task.cardName}>{task.cardName}</div>
-                            {task.members && task.members.length > 0 && (
-                              <div className="flex -space-x-1.5">
-                                {task.members.map((m: any) => (
-                                  <div key={m.id} className="w-5 h-5 rounded-full border border-white bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 overflow-hidden" title={m.fullName}>
-                                    {m.avatarUrl ? <img src={`${m.avatarUrl}/30.png`} alt={m.fullName} className="w-full h-full object-cover" /> : m.fullName.charAt(0)}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+                          <div className="text-[11px] text-slate-500 truncate max-w-[170px] mt-1" title={task.cardName}>{task.cardName}</div>
+                          
+                          {/* 오른쪽 아래에 해당 체크리스트 담당자 아이콘 표시 */}
+                          {task.members && task.members.length > 0 && (
+                            <div className="absolute right-0 bottom-0 flex">
+                              {task.members.map((m: any) => (
+                                <div key={m.id} className="w-5 h-5 rounded-full border border-white bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 overflow-hidden shadow-sm" title={m.fullName}>
+                                  {m.avatarUrl ? <img src={`${m.avatarUrl}/30.png`} alt={m.fullName} className="w-full h-full object-cover" /> : m.fullName.charAt(0)}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

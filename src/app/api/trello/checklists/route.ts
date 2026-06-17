@@ -30,6 +30,19 @@ export async function GET(request: Request) {
         );
         const boards = boardsRes.data;
 
+        // 워크스페이스 전체 멤버 목록 조회 및 매핑
+        const membersRes = await axios.get(
+            'https://api.trello.com/1/organizations/' + TRELLO_WORKSPACE_ID + '/members?key=' + TRELLO_API_KEY + '&token=' + TRELLO_API_TOKEN + '&fields=id,fullName,avatarUrl,username'
+        ).catch(e => {
+            console.error('Error fetching workspace members: ' + e.message);
+            return { data: [] };
+        });
+        const workspaceMembers = membersRes.data || [];
+        const membersMap = new Map<string, any>();
+        workspaceMembers.forEach((m: any) => {
+            membersMap.set(m.id, m);
+        });
+
         const promises = boards.map((b: any) =>
             axios.get('https://api.trello.com/1/boards/' + b.id + '/cards?checklists=all&fields=id,name,shortUrl,idMembers&members=true&member_fields=fullName,avatarUrl,username&key=' + TRELLO_API_KEY + '&token=' + TRELLO_API_TOKEN)
                 .catch(e => { console.error('Error on board ' + b.name + ': ' + e.message); return { data: [] }; })
@@ -46,6 +59,15 @@ export async function GET(request: Request) {
                         cl.checkItems.forEach((item: any) => {
                             if (item.due) {
                                 const dueDate = new Date(item.due);
+                                // 체크리스트 담당자 (idMember) 식별 및 매핑
+                                const itemMember = item.idMember ? membersMap.get(item.idMember) : null;
+                                const itemMembers = itemMember ? [{
+                                    id: itemMember.id,
+                                    fullName: itemMember.fullName,
+                                    avatarUrl: itemMember.avatarUrl,
+                                    username: itemMember.username
+                                }] : [];
+
                                 // Future items (today ~ endDate)
                                 if (dueDate >= today && dueDate < endDate) {
                                     const diffTime = dueDate.getTime() - today.getTime();
@@ -55,12 +77,7 @@ export async function GET(request: Request) {
                                         cardName: card.name, cardUrl: card.shortUrl,
                                         listName: cl.name, due: dueDate,
                                         state: item.state, dayIndex: diffDays,
-                                        members: card.members?.map((m: any) => ({
-                                            id: m.id,
-                                            fullName: m.fullName,
-                                            avatarUrl: m.avatarUrl,
-                                            username: m.username
-                                        })) || []
+                                        members: itemMembers
                                     });
                                 }
                                 // Overdue items (past, incomplete only)
@@ -70,12 +87,7 @@ export async function GET(request: Request) {
                                         cardName: card.name, cardUrl: card.shortUrl,
                                         listName: cl.name, due: dueDate,
                                         state: item.state, dayIndex: -1,
-                                        members: card.members?.map((m: any) => ({
-                                            id: m.id,
-                                            fullName: m.fullName,
-                                            avatarUrl: m.avatarUrl,
-                                            username: m.username
-                                        })) || []
+                                        members: itemMembers
                                     });
                                 }
                             }
