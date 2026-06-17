@@ -530,14 +530,14 @@ export default function ChecklistModal() {
           </div>
 
           {allMembers.length > 0 && (
-            <div className="flex items-center gap-1.5 bg-slate-100/60 p-1.5 rounded-full border border-black/5 shadow-inner">
+            <div className="flex items-center gap-1.5 bg-slate-100/60 p-1.5 rounded-full border border-black/5 shadow-inner h-10 select-none">
               <button
                 onClick={() => setSelectedMemberId(null)}
                 className={`w-7 h-7 rounded-full text-[10px] font-extrabold transition-all border flex items-center justify-center shrink-0 shadow-sm ${!selectedMemberId ? 'bg-sky-500 border-sky-600 text-white shadow-sm ring-2 ring-sky-100' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
               >
                 ALL
               </button>
-              <div className="flex items-center gap-1 overflow-x-auto max-w-[400px] no-scrollbar">
+              <div className="flex items-center gap-1 overflow-x-auto overflow-y-hidden max-w-[400px] no-scrollbar py-1 h-full">
                 {allMembers.map((m: any) => {
                   if (!m) return null;
                   const isSelected = selectedMemberId === m.id;
