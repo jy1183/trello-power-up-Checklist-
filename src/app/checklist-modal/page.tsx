@@ -44,6 +44,7 @@ export default function ChecklistModal() {
   const [selectedAddListId, setSelectedAddListId] = useState('');
   const [addModalCards, setAddModalCards] = useState<any[]>([]);
   const [selectedAddCardId, setSelectedAddCardId] = useState('');
+  const [cardSearchQuery, setCardSearchQuery] = useState('');
   const [submittingChecklist, setSubmittingChecklist] = useState(false);
   const [loadingAddModalData, setLoadingAddModalData] = useState(false);
 
@@ -58,6 +59,7 @@ export default function ChecklistModal() {
     setSelectedAddListId('');
     setAddModalCards([]);
     setSelectedAddCardId('');
+    setCardSearchQuery('');
     setLoadingAddModalData(true);
     try {
       const res = await fetch('/api/trello/boards');
@@ -98,13 +100,13 @@ export default function ChecklistModal() {
 
     setLoadingAddModalData(true);
     try {
-      const res = await fetch(`/api/trello/boards?boardId=${boardId}`);
+      const res = await fetch(`/api/trello/boards?boardId=${boardId}&cards=true`);
       const data = await res.json();
-      if (data.lists) {
-        setAddModalLists(data.lists);
+      if (data.cards) {
+        setAddModalCards(data.cards);
       }
     } catch (e) {
-      console.error('Failed to fetch lists:', e);
+      console.error('Failed to fetch cards:', e);
     } finally {
       setLoadingAddModalData(false);
     }
@@ -140,16 +142,16 @@ export default function ChecklistModal() {
       setIsAddModalOpen(false);
       return;
     }
-    if (mode === 'existing' && selectedAddBoardId && addModalLists.length === 0) {
+    if (mode === 'existing' && selectedAddBoardId && addModalCards.length === 0) {
       setLoadingAddModalData(true);
       try {
-        const res = await fetch(`/api/trello/boards?boardId=${selectedAddBoardId}`);
+        const res = await fetch(`/api/trello/boards?boardId=${selectedAddBoardId}&cards=true`);
         const data = await res.json();
-        if (data.lists) {
-          setAddModalLists(data.lists);
+        if (data.cards) {
+          setAddModalCards(data.cards);
         }
       } catch (e) {
-        console.error('Failed to fetch lists:', e);
+        console.error('Failed to fetch cards:', e);
       } finally {
         setLoadingAddModalData(false);
       }
@@ -513,6 +515,10 @@ export default function ChecklistModal() {
     return member;
   });
 
+  const filteredCards = addModalCards.filter(c =>
+    c.name.toLowerCase().includes(cardSearchQuery.toLowerCase())
+  );
+
   return (
     <div className="w-full h-full overflow-hidden flex flex-col bg-[#fcfbf7]">
       <Script src="https://p.trellocdn.com/power-up.min.js" strategy="beforeInteractive" />
@@ -773,21 +779,16 @@ export default function ChecklistModal() {
               {/* Mode-specific Fields */}
               {selectedAddBoardId && cardAddMode === 'existing' && (
                 <div className="space-y-3 pt-1 border-t border-dashed border-slate-100">
-                  {/* Select List */}
+                  {/* Card Search */}
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-600">리스트 선택</label>
-                    <select 
-                      required
-                      value={selectedAddListId}
-                      onChange={(e) => handleAddListChange(e.target.value)}
-                      disabled={addModalLists.length === 0}
-                      className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-sm transition-all outline-none cursor-pointer font-medium disabled:opacity-60"
-                    >
-                      <option value="">리스트를 선택하세요</option>
-                      {addModalLists.map((l) => (
-                        <option key={l.id} value={l.id}>{l.name}</option>
-                      ))}
-                    </select>
+                    <label className="block text-xs font-bold text-slate-600">카드 검색</label>
+                    <input 
+                      type="text" 
+                      placeholder="검색할 카드명을 입력하세요" 
+                      value={cardSearchQuery}
+                      onChange={(e) => setCardSearchQuery(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-sm transition-all outline-none focus:ring-2 focus:ring-sky-100 font-medium"
+                    />
                   </div>
 
                   {/* Select Card */}
@@ -797,11 +798,11 @@ export default function ChecklistModal() {
                       required
                       value={selectedAddCardId}
                       onChange={(e) => setSelectedAddCardId(e.target.value)}
-                      disabled={addModalCards.length === 0}
+                      disabled={filteredCards.length === 0}
                       className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-sm transition-all outline-none cursor-pointer font-medium disabled:opacity-60"
                     >
                       <option value="">카드를 선택하세요</option>
-                      {addModalCards.map((c) => (
+                      {filteredCards.map((c) => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
