@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import axios from 'axios';
 import { GoogleGenAI } from '@google/genai';
 
+export const maxDuration = 60; // 60 seconds (Vercel max execution time)
+
 const TRELLO_API_KEY = process.env.TRELLO_API_KEY;
 const TRELLO_API_TOKEN = process.env.TRELLO_API_TOKEN;
 const TRELLO_WORKSPACE_ID = process.env.TRELLO_WORKSPACE_ID;
