@@ -21,6 +21,12 @@ export async function GET(request: Request) {
                 const res = await axios.get(url);
                 return NextResponse.json({ cards: res.data });
             }
+            const fetchMembers = searchParams.get('members') === 'true';
+            if (fetchMembers) {
+                const url = `https://api.trello.com/1/boards/${boardId}/members?key=${TRELLO_API_KEY}&token=${TRELLO_API_TOKEN}&fields=id,fullName,username,avatarUrl`;
+                const res = await axios.get(url);
+                return NextResponse.json({ members: res.data });
+            }
             // Get lists of the board
             const url = `https://api.trello.com/1/boards/${boardId}/lists?key=${TRELLO_API_KEY}&token=${TRELLO_API_TOKEN}&fields=id,name`;
             const res = await axios.get(url);

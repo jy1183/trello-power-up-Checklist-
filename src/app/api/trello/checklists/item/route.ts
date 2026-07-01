@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     }
     try {
         const body = await request.json();
-        const { checklistId, cardId, name, due } = body;
+        const { checklistId, cardId, name, due, idMember } = body;
         
         if (!name) {
             return NextResponse.json({ error: 'Missing name parameter' }, { status: 400 });
@@ -45,9 +45,15 @@ export async function POST(request: Request) {
         );
         const checkItem = res.data;
 
-        // 2. If due date is provided, update the due date
-        if (due && cardId) {
-            const updateUrl = `https://api.trello.com/1/cards/${cardId}/checkItem/${checkItem.id}?due=${encodeURIComponent(due)}&key=${TRELLO_API_KEY}&token=${TRELLO_API_TOKEN}`;
+        // 2. If due date or member assignment is provided, update the checkitem details
+        if ((due || idMember) && cardId) {
+            let updateUrl = `https://api.trello.com/1/cards/${cardId}/checkItem/${checkItem.id}?key=${TRELLO_API_KEY}&token=${TRELLO_API_TOKEN}`;
+            if (due) {
+                updateUrl += `&due=${encodeURIComponent(due)}`;
+            }
+            if (idMember) {
+                updateUrl += `&idMember=${encodeURIComponent(idMember)}`;
+            }
             const updateRes = await axios.put(updateUrl);
             return NextResponse.json({ success: true, item: updateRes.data });
         }

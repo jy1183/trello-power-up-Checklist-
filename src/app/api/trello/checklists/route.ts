@@ -15,8 +15,10 @@ export async function GET(request: Request) {
         const rangeDays = parseInt(searchParams.get('days') || '3', 10);
         const includeOverdue = searchParams.get('overdue') === 'true';
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const now = new Date();
+        const kstOffset = 9 * 60 * 60 * 1000;
+        const kstNow = new Date(now.getTime() + kstOffset);
+        const today = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()));
 
         const endDate = new Date(today);
         endDate.setDate(endDate.getDate() + rangeDays + 1);
@@ -57,8 +59,11 @@ export async function GET(request: Request) {
                 if (card.checklists) {
                     card.checklists.forEach((cl: any) => {
                         cl.checkItems.forEach((item: any) => {
-                            if (item.due) {
+                             if (item.due) {
                                 const dueDate = new Date(item.due);
+                                const kstDue = new Date(dueDate.getTime() + kstOffset);
+                                const dueKstOnly = new Date(Date.UTC(kstDue.getUTCFullYear(), kstDue.getUTCMonth(), kstDue.getUTCDate()));
+
                                 // 체크리스트 담당자 (idMember) 식별 및 매핑
                                 const itemMember = item.idMember ? membersMap.get(item.idMember) : null;
                                 const itemMembers = itemMember ? [{
@@ -69,8 +74,8 @@ export async function GET(request: Request) {
                                 }] : [];
 
                                 // Future items (today ~ endDate)
-                                if (dueDate >= today && dueDate < endDate) {
-                                    const diffTime = dueDate.getTime() - today.getTime();
+                                if (dueKstOnly >= today && dueKstOnly < endDate) {
+                                    const diffTime = dueKstOnly.getTime() - today.getTime();
                                     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
                                     allItems.push({
                                         id: item.id, cardId: card.id, title: item.name,
@@ -81,7 +86,7 @@ export async function GET(request: Request) {
                                     });
                                 }
                                 // Overdue items (past, incomplete only)
-                                if (includeOverdue && dueDate < today && dueDate >= overdueStart && item.state !== 'complete') {
+                                if (includeOverdue && dueKstOnly < today && dueKstOnly >= overdueStart && item.state !== 'complete') {
                                     overdueItems.push({
                                         id: item.id, cardId: card.id, title: item.name,
                                         cardName: card.name, cardUrl: card.shortUrl,

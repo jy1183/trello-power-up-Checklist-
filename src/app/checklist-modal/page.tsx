@@ -45,6 +45,8 @@ export default function ChecklistModal() {
   const [addModalCards, setAddModalCards] = useState<any[]>([]);
   const [selectedAddCardId, setSelectedAddCardId] = useState('');
   const [cardSearchQuery, setCardSearchQuery] = useState('');
+  const [addModalMembers, setAddModalMembers] = useState<any[]>([]);
+  const [selectedAddMemberId, setSelectedAddMemberId] = useState('');
   const [submittingChecklist, setSubmittingChecklist] = useState(false);
   const [loadingAddModalData, setLoadingAddModalData] = useState(false);
 
@@ -60,6 +62,8 @@ export default function ChecklistModal() {
     setAddModalCards([]);
     setSelectedAddCardId('');
     setCardSearchQuery('');
+    setAddModalMembers([]);
+    setSelectedAddMemberId('');
     setLoadingAddModalData(true);
     try {
       const res = await fetch('/api/trello/boards');
@@ -78,8 +82,10 @@ export default function ChecklistModal() {
     setSelectedAddBoardId(boardId);
     setSelectedAddListId('');
     setSelectedAddCardId('');
+    setSelectedAddMemberId('');
     setAddModalLists([]);
     setAddModalCards([]);
+    setAddModalMembers([]);
     
     const board = addModalBoards.find(b => b.id === boardId);
     let boardUrl = '';
@@ -100,13 +106,20 @@ export default function ChecklistModal() {
 
     setLoadingAddModalData(true);
     try {
-      const res = await fetch(`/api/trello/boards?boardId=${boardId}&cards=true`);
-      const data = await res.json();
-      if (data.cards) {
-        setAddModalCards(data.cards);
+      const [cardsRes, membersRes] = await Promise.all([
+        fetch(`/api/trello/boards?boardId=${boardId}&cards=true`),
+        fetch(`/api/trello/boards?boardId=${boardId}&members=true`)
+      ]);
+      const cardsData = await cardsRes.json();
+      const membersData = await membersRes.json();
+      if (cardsData.cards) {
+        setAddModalCards(cardsData.cards);
+      }
+      if (membersData.members) {
+        setAddModalMembers(membersData.members);
       }
     } catch (e) {
-      console.error('Failed to fetch cards:', e);
+      console.error('Failed to fetch cards or members:', e);
     } finally {
       setLoadingAddModalData(false);
     }
@@ -145,13 +158,20 @@ export default function ChecklistModal() {
     if (mode === 'existing' && selectedAddBoardId && addModalCards.length === 0) {
       setLoadingAddModalData(true);
       try {
-        const res = await fetch(`/api/trello/boards?boardId=${selectedAddBoardId}&cards=true`);
-        const data = await res.json();
-        if (data.cards) {
-          setAddModalCards(data.cards);
+        const [cardsRes, membersRes] = await Promise.all([
+          fetch(`/api/trello/boards?boardId=${selectedAddBoardId}&cards=true`),
+          fetch(`/api/trello/boards?boardId=${selectedAddBoardId}&members=true`)
+        ]);
+        const cardsData = await cardsRes.json();
+        const membersData = await membersRes.json();
+        if (cardsData.cards) {
+          setAddModalCards(cardsData.cards);
+        }
+        if (membersData.members) {
+          setAddModalMembers(membersData.members);
         }
       } catch (e) {
-        console.error('Failed to fetch cards:', e);
+        console.error('Failed to fetch cards or members:', e);
       } finally {
         setLoadingAddModalData(false);
       }
@@ -189,7 +209,8 @@ export default function ChecklistModal() {
         body: JSON.stringify({
           cardId: selectedAddCardId,
           name: addModalItemName.trim(),
-          due: dueIso
+          due: dueIso,
+          idMember: selectedAddMemberId || undefined
         })
       });
       const data = await res.json();
@@ -808,18 +829,34 @@ export default function ChecklistModal() {
                     </select>
                   </div>
 
-                  {/* Item Name (할 일 이름) */}
+                  {/* Item Name (할 일 이름) & 담당자 선택 */}
                   {selectedAddCardId && (
-                    <div className="space-y-1.5 pt-3 border-t border-dashed border-slate-100">
-                      <label className="block text-xs font-bold text-slate-600">할 일 이름</label>
-                      <input 
-                        type="text" 
-                        required
-                        placeholder="해야 할 체크리스트 항목명을 입력하세요" 
-                        value={addModalItemName}
-                        onChange={(e) => setAddModalItemName(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-sm transition-all outline-none focus:ring-2 focus:ring-sky-100 font-medium"
-                      />
+                    <div className="space-y-3 pt-3 border-t border-dashed border-slate-100">
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-slate-600">할 일 이름</label>
+                        <input 
+                          type="text" 
+                          required
+                          placeholder="해야 할 체크리스트 항목명을 입력하세요" 
+                          value={addModalItemName}
+                          onChange={(e) => setAddModalItemName(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-sm transition-all outline-none focus:ring-2 focus:ring-sky-100 font-medium"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-slate-600">담당자 선택</label>
+                        <select 
+                          value={selectedAddMemberId}
+                          onChange={(e) => setSelectedAddMemberId(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-sky-500 rounded-lg text-sm transition-all outline-none cursor-pointer font-medium disabled:opacity-60"
+                        >
+                          <option value="">담당자를 선택하세요 (선택 안 함)</option>
+                          {addModalMembers.map((m) => (
+                            <option key={m.id} value={m.id}>{m.fullName} ({m.username})</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   )}
                 </div>
