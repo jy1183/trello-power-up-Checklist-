@@ -513,19 +513,44 @@ export default function ChecklistModal() {
     return Math.floor(hours / 24) + '일 전';
   };
 
-  const filteredTodos = todos.filter(t => {
-    const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         t.cardName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesMember = !selectedMemberId || (t.members && t.members.some((m: any) => m.id === selectedMemberId));
-    return matchesSearch && matchesMember;
-  });
+  const sortTasks = (tasks: any[]) => {
+    return tasks.sort((a, b) => {
+      // 1. 완료 상태 비교 (완료된 항목은 밑으로)
+      if (a.state === 'complete' && b.state !== 'complete') return 1;
+      if (a.state !== 'complete' && b.state === 'complete') return -1;
+      
+      // 2. 카드 이름으로 정렬 (가나다, 숫자, 영문 순)
+      const getCharWeight = (char: string) => {
+        if (!char) return 4;
+        if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(char)) return 1;
+        if (/[0-9]/.test(char)) return 2;
+        if (/[a-zA-Z]/.test(char)) return 3;
+        return 4;
+      };
+      
+      const weightA = getCharWeight(a.cardName.charAt(0));
+      const weightB = getCharWeight(b.cardName.charAt(0));
+      
+      if (weightA !== weightB) {
+        return weightA - weightB;
+      }
+      return a.cardName.localeCompare(b.cardName, 'ko-KR');
+    });
+  };
 
-  const filteredOverdue = overdueTodos.filter(t => {
+  const filteredTodos = sortTasks(todos.filter(t => {
     const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          t.cardName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesMember = !selectedMemberId || (t.members && t.members.some((m: any) => m.id === selectedMemberId));
     return matchesSearch && matchesMember;
-  });
+  }));
+
+  const filteredOverdue = sortTasks(overdueTodos.filter(t => {
+    const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         t.cardName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesMember = !selectedMemberId || (t.members && t.members.some((m: any) => m.id === selectedMemberId));
+    return matchesSearch && matchesMember;
+  }));
 
   // Extract unique members from all tasks for filter
   const allMembers = Array.from(new Set([
