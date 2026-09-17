@@ -506,8 +506,8 @@ export default function ChecklistModal() {
 
   const renderActivityText = (text: string) => {
     if (!text) return null;
-    // 마크다운 링크 [파일명](URL) 패턴 매칭 (URL 내 괄호 포함 지원)
-    const markdownLinkRegex = /\[([^\]]+)\]\((https?:\/\/(?:[^\s\(\)]|\([^\s\(\)]*\))+)\)/g;
+    // 마크다운 링크 [파일명](URL "title") 패턴 매칭 (URL 내 괄호 및 후속 title/공백 완벽 지원)
+    const markdownLinkRegex = /\[([^\]]+)\]\((https?:\/\/(?:[^\s\(\)]|\([^\s\(\)]*\))+)(?:\s+[^)]*)?\)/g;
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let match: RegExpExecArray | null;
