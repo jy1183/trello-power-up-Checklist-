@@ -504,6 +504,45 @@ export default function ChecklistModal() {
     }
   };
 
+  const renderActivityText = (text: string) => {
+    if (!text) return null;
+    // 마크다운 링크 [파일명](URL) 패턴 매칭 (URL 내 괄호 포함 지원)
+    const markdownLinkRegex = /\[([^\]]+)\]\((https?:\/\/(?:[^\s\(\)]|\([^\s\(\)]*\))+)\)/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = markdownLinkRegex.exec(text)) !== null) {
+      const matchIndex = match.index;
+      if (matchIndex > lastIndex) {
+        parts.push(text.substring(lastIndex, matchIndex));
+      }
+      const fileName = match[1];
+      const fileUrl = match[2];
+      parts.push(
+        <a
+          key={matchIndex}
+          href={fileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sky-600 hover:text-sky-800 hover:underline font-semibold break-all inline-flex items-center gap-1 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-100 my-0.5 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+          title={fileUrl}
+        >
+          <Paperclip size={11} className="shrink-0 text-sky-500" />
+          <span>{fileName}</span>
+        </a>
+      );
+      lastIndex = matchIndex + match[0].length;
+    }
+
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : text;
+  };
+
   const getTimeAgo = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
@@ -729,7 +768,7 @@ export default function ChecklistModal() {
                     {a.text && (
                       <div className="text-[13px] text-slate-500 mt-1.5 bg-slate-50 p-2 rounded border border-slate-100 flex items-start gap-1">
                         <MessageSquare size={12} className="mt-0.5 shrink-0 text-slate-400" />
-                        <span className="italic whitespace-pre-wrap break-all w-full leading-normal">{a.text}</span>
+                        <span className="italic whitespace-pre-wrap break-all w-full leading-normal">{renderActivityText(a.text)}</span>
                       </div>
                     )}
                   </div>
