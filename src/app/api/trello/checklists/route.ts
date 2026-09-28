@@ -28,9 +28,9 @@ export async function GET(request: Request) {
         overdueStart.setDate(overdueStart.getDate() - 30);
 
         const boardsRes = await axios.get(
-            'https://api.trello.com/1/organizations/' + TRELLO_WORKSPACE_ID + '/boards?key=' + TRELLO_API_KEY + '&token=' + TRELLO_API_TOKEN + '&fields=id,name'
+            'https://api.trello.com/1/organizations/' + TRELLO_WORKSPACE_ID + '/boards?filter=open&key=' + TRELLO_API_KEY + '&token=' + TRELLO_API_TOKEN + '&fields=id,name,closed'
         );
-        const boards = boardsRes.data;
+        const boards = (boardsRes.data || []).filter((b: any) => !b.closed);
 
         // 워크스페이스 전체 멤버 목록 조회 및 매핑
         const membersRes = await axios.get(
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
         });
 
         const promises = boards.map((b: any) =>
-            axios.get('https://api.trello.com/1/boards/' + b.id + '/cards?checklists=all&fields=id,name,shortUrl,idMembers&members=true&member_fields=fullName,avatarUrl,username&key=' + TRELLO_API_KEY + '&token=' + TRELLO_API_TOKEN)
+            axios.get('https://api.trello.com/1/boards/' + b.id + '/cards?filter=visible&checklists=all&fields=id,name,shortUrl,idMembers,closed&members=true&member_fields=fullName,avatarUrl,username&key=' + TRELLO_API_KEY + '&token=' + TRELLO_API_TOKEN)
                 .catch(e => { console.error('Error on board ' + b.name + ': ' + e.message); return { data: [] }; })
         );
 
@@ -56,7 +56,8 @@ export async function GET(request: Request) {
         const noDueItems: any[] = [];
 
         results.forEach(res => {
-            res.data.forEach((card: any) => {
+            (res.data || []).forEach((card: any) => {
+                if (card.closed) return;
                 if (card.checklists) {
                     card.checklists.forEach((cl: any) => {
                         cl.checkItems.forEach((item: any) => {

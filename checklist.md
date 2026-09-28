@@ -8,3 +8,10 @@
 - [x] 더블클릭 추가 연동: '기한 없음' 컬럼에서 새 할일 추가 시 기한 없이 등록 지원
 - [x] 빌드 및 타입 검사 (`npx tsc --noEmit`) 검증
 - [x] context-notes.md 업데이트 및 최종 정리
+
+## 보완: 아카이브된 카드의 체크리스트 제외
+- [x] Trello API 보드 조회 시 닫힌(closed) 보드 제외 (`filter=open` 및 `!b.closed`)
+- [x] Trello API 카드 조회 시 아카이브된 카드 제외 (`filter=visible` 쿼리 파라미터 적용)
+- [x] 카드 순회 시 `card.closed` 체크하여 아카이브된 카드 체크리스트 배제
+- [x] 타입 검사 및 빌드 검증 (`npx tsc --noEmit`)
+- [x] context-notes.md 업데이트 및 완료 보고
