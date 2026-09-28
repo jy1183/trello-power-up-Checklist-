@@ -53,25 +53,26 @@ export async function GET(request: Request) {
         const results = await Promise.all(promises);
         const allItems: any[] = [];
         const overdueItems: any[] = [];
+        const noDueItems: any[] = [];
 
         results.forEach(res => {
             res.data.forEach((card: any) => {
                 if (card.checklists) {
                     card.checklists.forEach((cl: any) => {
                         cl.checkItems.forEach((item: any) => {
-                             if (item.due) {
+                            // 체크리스트 담당자 (idMember) 식별 및 매핑
+                            const itemMember = item.idMember ? membersMap.get(item.idMember) : null;
+                            const itemMembers = itemMember ? [{
+                                id: itemMember.id,
+                                fullName: itemMember.fullName,
+                                avatarUrl: itemMember.avatarUrl,
+                                username: itemMember.username
+                            }] : [];
+
+                            if (item.due) {
                                 const dueDate = new Date(item.due);
                                 const kstDue = new Date(dueDate.getTime() + kstOffset);
                                 const dueKstOnly = new Date(Date.UTC(kstDue.getUTCFullYear(), kstDue.getUTCMonth(), kstDue.getUTCDate()));
-
-                                // 체크리스트 담당자 (idMember) 식별 및 매핑
-                                const itemMember = item.idMember ? membersMap.get(item.idMember) : null;
-                                const itemMembers = itemMember ? [{
-                                    id: itemMember.id,
-                                    fullName: itemMember.fullName,
-                                    avatarUrl: itemMember.avatarUrl,
-                                    username: itemMember.username
-                                }] : [];
 
                                 // Future items (today ~ endDate)
                                 if (dueKstOnly >= today && dueKstOnly < endDate) {
@@ -95,6 +96,17 @@ export async function GET(request: Request) {
                                         members: itemMembers
                                     });
                                 }
+                            } else {
+                                // No due items (incomplete only)
+                                if (item.state !== 'complete') {
+                                    noDueItems.push({
+                                        id: item.id, cardId: card.id, title: item.name,
+                                        cardName: card.name, cardUrl: card.shortUrl,
+                                        listName: cl.name, due: null,
+                                        state: item.state, dayIndex: -2,
+                                        members: itemMembers
+                                    });
+                                }
                             }
                         });
                     });
@@ -108,7 +120,8 @@ export async function GET(request: Request) {
         return NextResponse.json({
             date: today.toISOString().split('T')[0],
             tasks: allItems,
-            overdueTasks: overdueItems
+            overdueTasks: overdueItems,
+            noDueTasks: noDueItems
         });
 
     } catch (error: any) {
@@ -134,7 +147,13 @@ export async function PUT(request: Request) {
         }
         let url = 'https://api.trello.com/1/cards/' + cardId + '/checkItem/' + itemId + '?key=' + TRELLO_API_KEY + '&token=' + TRELLO_API_TOKEN;
         if (state) url += '&state=' + state;
-        if (dueDate) url += '&due=' + encodeURIComponent(dueDate);
+        if (dueDate !== undefined) {
+            if (dueDate === null || dueDate === '') {
+                url += '&due=null';
+            } else {
+                url += '&due=' + encodeURIComponent(dueDate);
+            }
+        }
         const res = await axios.put(url);
         return NextResponse.json({ success: true, item: res.data });
     } catch (error) {

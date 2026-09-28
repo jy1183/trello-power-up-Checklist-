@@ -10,6 +10,7 @@ import remarkBreaks from 'remark-breaks';
 export default function ChecklistModal() {
   const [todos, setTodos] = useState<any[]>([]);
   const [overdueTodos, setOverdueTodos] = useState<any[]>([]);
+  const [noDueTodos, setNoDueTodos] = useState<any[]>([]);
   const [loadingTodos, setLoadingTodos] = useState(true);
 
   const [trello, setTrello] = useState<any>(null);
@@ -194,14 +195,15 @@ export default function ChecklistModal() {
 
     setSubmittingChecklist(true);
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const targetDate = new Date(today);
-      if (addModalDayOffset !== null) {
+      let dueIso: string | undefined = undefined;
+      if (addModalDayOffset !== null && addModalDayOffset >= 0) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const targetDate = new Date(today);
         targetDate.setDate(today.getDate() + addModalDayOffset);
+        targetDate.setHours(12, 0, 0, 0);
+        dueIso = targetDate.toISOString();
       }
-      targetDate.setHours(12, 0, 0, 0);
-      const dueIso = targetDate.toISOString();
 
       const res = await fetch('/api/trello/checklists/item', {
         method: 'POST',
@@ -408,6 +410,7 @@ export default function ChecklistModal() {
       }
       if (data.tasks) setTodos(data.tasks);
       if (data.overdueTasks) setOverdueTodos(data.overdueTasks);
+      if (data.noDueTasks) setNoDueTodos(data.noDueTasks);
     } catch (e: any) { 
       console.error(e); 
       alert('서버 에러 원인: ' + e.message);
@@ -415,10 +418,17 @@ export default function ChecklistModal() {
   };
 
   const handleCheck = async (taskId: string, cardId: string, currentState: string) => {
+    const origNoDueTask = noDueTodos.find(t => t.id === taskId);
     const newState = currentState === 'complete' ? 'incomplete' : 'complete';
     const updateTask = (t: any) => t.id === taskId ? { ...t, state: newState } : t;
     setTodos(prev => prev.map(updateTask));
     setOverdueTodos(prev => prev.map(updateTask));
+    setNoDueTodos(prev => {
+      if (newState === 'complete') {
+        return prev.filter(t => t.id !== taskId);
+      }
+      return prev.map(updateTask);
+    });
     
     try { 
       await fetch('/api/trello/checklists', { 
@@ -434,6 +444,14 @@ export default function ChecklistModal() {
       const revertTask = (t: any) => t.id === taskId ? { ...t, state: currentState } : t; 
       setTodos(prev => prev.map(revertTask)); 
       setOverdueTodos(prev => prev.map(revertTask));
+      if (origNoDueTask) {
+        setNoDueTodos(prev => {
+          if (!prev.some(t => t.id === taskId)) return [...prev, origNoDueTask];
+          return prev.map(revertTask);
+        });
+      } else {
+        setNoDueTodos(prev => prev.map(revertTask));
+      }
     }
   };
 
@@ -458,9 +476,37 @@ export default function ChecklistModal() {
   const handleDrop = async (e: React.DragEvent, targetDayOffset: number) => {
     e.preventDefault(); const taskJson = e.dataTransfer.getData('task'); if (!taskJson) return;
     const task = JSON.parse(taskJson); if (task.dayIndex === targetDayOffset) return;
-    const currentDue = new Date(task.due); const today = new Date(); today.setHours(0, 0, 0, 0);
+
+    if (targetDayOffset === -2) {
+      // 기한 없음 보드로 이동 (due=null)
+      const updatedTask = { ...task, dayIndex: -2, due: null };
+      setTodos(prev => prev.filter(t => t.id !== task.id));
+      setOverdueTodos(prev => prev.filter(t => t.id !== task.id));
+      setNoDueTodos(prev => [...prev.filter(t => t.id !== task.id), updatedTask]);
+
+      try {
+        await fetch('/api/trello/checklists', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cardId: task.cardId, itemId: task.id, dueDate: null })
+        });
+      } catch (err) {
+        console.error(err);
+        setNoDueTodos(prev => prev.filter(t => t.id !== task.id));
+        if (task.dayIndex === -1) {
+          setOverdueTodos(prev => [...prev, task]);
+        } else {
+          setTodos(prev => [...prev, task]);
+        }
+      }
+      return;
+    }
+
+    // 요일 보드로 이동 (targetDayOffset >= 0)
+    const currentDue = task.due ? new Date(task.due) : new Date();
+    const today = new Date(); today.setHours(0, 0, 0, 0);
     const newDate = new Date(today); newDate.setDate(today.getDate() + targetDayOffset);
-    newDate.setHours(currentDue.getHours() || 12, currentDue.getMinutes() || 0, 0);
+    newDate.setHours(task.due ? (currentDue.getHours() || 12) : 12, task.due ? (currentDue.getMinutes() || 0) : 0, 0);
     const newDueIso = newDate.toISOString();
     const updateTask = (t: any) => t.id === task.id ? { ...t, dayIndex: targetDayOffset, due: newDueIso } : t;
     setTodos(prev => {
@@ -470,11 +516,22 @@ export default function ChecklistModal() {
     if (task.dayIndex === -1) {
       setOverdueTodos(prev => prev.filter(t => t.id !== task.id));
     }
-    try { await fetch('/api/trello/checklists', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cardId: task.cardId, itemId: task.id, dueDate: newDueIso }) }); }
-    catch (err) { 
+    if (task.dayIndex === -2) {
+      setNoDueTodos(prev => prev.filter(t => t.id !== task.id));
+    }
+    try {
+      await fetch('/api/trello/checklists', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId: task.cardId, itemId: task.id, dueDate: newDueIso })
+      });
+    } catch (err) { 
       console.error(err); 
       if (task.dayIndex === -1) {
         setOverdueTodos(prev => [...prev, task]);
+        setTodos(prev => prev.filter(t => t.id !== task.id));
+      } else if (task.dayIndex === -2) {
+        setNoDueTodos(prev => [...prev, task]);
         setTodos(prev => prev.filter(t => t.id !== task.id));
       } else {
         setTodos(prev => prev.map(t => t.id === task.id ? task : t)); 
@@ -483,6 +540,7 @@ export default function ChecklistModal() {
   };
 
   const getDayName = (offset: number) => {
+    if (offset === -2) return '기한 없음';
     const dates = ['일', '월', '화', '수', '목', '금', '토'];
     const d = new Date(); d.setDate(d.getDate() + offset);
     if (offset === 0) return '오늘 (' + (d.getMonth() + 1) + '/' + d.getDate() + ')';
@@ -591,12 +649,20 @@ export default function ChecklistModal() {
     return matchesSearch && matchesMember;
   }));
 
+  const filteredNoDue = sortTasks(noDueTodos.filter(t => {
+    const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         t.cardName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesMember = !selectedMemberId || (t.members && t.members.some((m: any) => m.id === selectedMemberId));
+    return matchesSearch && matchesMember;
+  }));
+
   // Extract unique members from all tasks for filter
   const allMembers = Array.from(new Set([
     ...todos.flatMap(t => t.members || []),
-    ...overdueTodos.flatMap(t => t.members || [])
+    ...overdueTodos.flatMap(t => t.members || []),
+    ...noDueTodos.flatMap(t => t.members || [])
   ].map(m => m.id))).map(id => {
-    const member = [...todos, ...overdueTodos].flatMap(t => t.members || []).find(m => m.id === id);
+    const member = [...todos, ...overdueTodos, ...noDueTodos].flatMap(t => t.members || []).find(m => m.id === id);
     return member;
   });
 
@@ -659,6 +725,42 @@ export default function ChecklistModal() {
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 overflow-x-auto overflow-y-hidden p-5 bg-[#f6f5f0] relative min-w-0 custom-scrollbar">
         <div className={`flex gap-4 h-full transition-opacity duration-300 ${loadingTodos ? 'opacity-40' : 'opacity-100'}`} style={{ width: 'max-content' }}>
+          {/* 기한 없음 보드 (가장 왼쪽에 항상 표시, 인덱스 개념으로 0개여도 유지) */}
+          <div className="flex flex-col h-full rounded-xl border bg-slate-50/60 border-slate-200 overflow-hidden w-[260px] shrink-0" onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, -2)}>
+            <div className="py-2.5 px-3 text-center text-sm font-bold border-b bg-slate-100/70 text-slate-700 border-slate-200 flex items-center justify-center gap-1">
+              <CheckSquare size={13} className="text-slate-500" /> 기한 없음 ({filteredNoDue.length})
+            </div>
+            <div className="flex-1 p-2 space-y-2 overflow-y-auto custom-scrollbar" onDoubleClick={() => openAddModal(-2)}>
+              {filteredNoDue.map(task => (
+                <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task)} onDoubleClick={(e) => e.stopPropagation()} className="p-2.5 rounded-lg border shadow-sm transition-all cursor-move bg-white border-slate-200 hover:border-slate-300">
+                  <div className="flex items-start gap-2">
+                    <input type="checkbox" checked={task.state === 'complete'} onChange={() => handleCheck(task.id, task.cardId, task.state)} className="mt-1 w-4 h-4 accent-slate-600 rounded cursor-pointer" />
+                    <div className="flex-1 min-w-0 relative pb-5">
+                      <button onClick={() => openCardInTrello(task.cardUrl)} className="block text-left w-full text-[13px] font-bold leading-tight hover:text-sky-600 transition-colors text-slate-700">{task.title}</button>
+                      <div className="text-[11px] text-slate-500 truncate max-w-[170px] mt-1" title={task.cardName}>{task.cardName}</div>
+                      
+                      {/* 오른쪽 아래에 해당 체크리스트 담당자 아이콘 표시 */}
+                      {task.members && task.members.length > 0 && (
+                        <div className="absolute right-0 bottom-0 flex">
+                          {task.members.map((m: any) => (
+                            <div key={m.id} className="w-5 h-5 rounded-full border border-white bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 overflow-hidden shadow-sm" title={m.fullName}>
+                              {m.avatarUrl ? <img src={`${m.avatarUrl}/30.png`} alt={m.fullName} className="w-full h-full object-cover" /> : m.fullName.charAt(0)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {filteredNoDue.length === 0 && (
+                <div className="text-center text-slate-400 text-xs py-4 flex items-center justify-center h-full opacity-50 border-2 border-dashed border-slate-200 hover:border-slate-300 rounded-lg cursor-pointer" onDoubleClick={() => openAddModal(-2)}>
+                  가져다 놓기 (더블클릭하여 추가)
+                </div>
+              )}
+            </div>
+          </div>
+
           {filteredOverdue.length > 0 && (
             <div className="flex flex-col h-full rounded-xl border bg-red-50/30 border-red-200 overflow-hidden w-[260px] shrink-0">
               <div className="py-2.5 px-3 text-center text-sm font-bold border-b bg-red-100/50 text-red-600 border-red-200 flex items-center justify-center gap-1"><Clock size={13} /> 기한 지남 ({filteredOverdue.length})</div>
