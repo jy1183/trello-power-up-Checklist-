@@ -100,11 +100,15 @@ export async function GET(request: Request) {
                             } else {
                                 // No due items (incomplete only)
                                 if (item.state !== 'complete') {
+                                    const isStorage = item.name.startsWith('[보관함]');
+                                    const cleanTitle = isStorage ? item.name.replace(/^\[보관함\]\s*/, '') : item.name;
                                     noDueItems.push({
-                                        id: item.id, cardId: card.id, title: item.name,
+                                        id: item.id, cardId: card.id, title: cleanTitle,
+                                        rawTitle: item.name,
                                         cardName: card.name, cardUrl: card.shortUrl,
                                         listName: cl.name, due: null,
                                         state: item.state, dayIndex: -2,
+                                        isStorage: isStorage,
                                         members: itemMembers
                                     });
                                 }
@@ -142,12 +146,13 @@ export async function PUT(request: Request) {
     }
     try {
         const body = await request.json();
-        const { cardId, itemId, state, dueDate } = body;
+        const { cardId, itemId, state, dueDate, name } = body;
         if (!cardId || !itemId) {
             return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
         }
         let url = 'https://api.trello.com/1/cards/' + cardId + '/checkItem/' + itemId + '?key=' + TRELLO_API_KEY + '&token=' + TRELLO_API_TOKEN;
         if (state) url += '&state=' + state;
+        if (name !== undefined) url += '&name=' + encodeURIComponent(name);
         if (dueDate !== undefined) {
             if (dueDate === null || dueDate === '') {
                 url += '&due=null';

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Script from 'next/script';
-import { CheckSquare, Clock, RefreshCw, Search, MessageSquare, Tag, AlignLeft, Paperclip, ExternalLink, Send, Plus, X } from 'lucide-react';
+import { CheckSquare, Clock, RefreshCw, Search, MessageSquare, Tag, AlignLeft, Paperclip, ExternalLink, Send, Plus, X, Archive, ChevronDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -11,6 +11,7 @@ export default function ChecklistModal() {
   const [todos, setTodos] = useState<any[]>([]);
   const [overdueTodos, setOverdueTodos] = useState<any[]>([]);
   const [noDueTodos, setNoDueTodos] = useState<any[]>([]);
+  const [isStorageOpen, setIsStorageOpen] = useState(false);
   const [loadingTodos, setLoadingTodos] = useState(true);
 
   const [trello, setTrello] = useState<any>(null);
@@ -475,11 +476,12 @@ export default function ChecklistModal() {
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); };
   const handleDrop = async (e: React.DragEvent, targetDayOffset: number) => {
     e.preventDefault(); const taskJson = e.dataTransfer.getData('task'); if (!taskJson) return;
-    const task = JSON.parse(taskJson); if (task.dayIndex === targetDayOffset) return;
+    const task = JSON.parse(taskJson);
 
+    // 1. 일반 '기한 없음' 보드로 이동 (targetDayOffset === -2)
     if (targetDayOffset === -2) {
-      // 기한 없음 보드로 이동 (due=null)
-      const updatedTask = { ...task, dayIndex: -2, due: null };
+      if (task.dayIndex === -2 && !task.isStorage) return;
+      const updatedTask = { ...task, dayIndex: -2, due: null, isStorage: false, rawTitle: task.title };
       setTodos(prev => prev.filter(t => t.id !== task.id));
       setOverdueTodos(prev => prev.filter(t => t.id !== task.id));
       setNoDueTodos(prev => [...prev.filter(t => t.id !== task.id), updatedTask]);
@@ -488,13 +490,15 @@ export default function ChecklistModal() {
         await fetch('/api/trello/checklists', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cardId: task.cardId, itemId: task.id, dueDate: null })
+          body: JSON.stringify({ cardId: task.cardId, itemId: task.id, dueDate: null, name: task.title })
         });
       } catch (err) {
         console.error(err);
         setNoDueTodos(prev => prev.filter(t => t.id !== task.id));
         if (task.dayIndex === -1) {
           setOverdueTodos(prev => [...prev, task]);
+        } else if (task.dayIndex === -2) {
+          setNoDueTodos(prev => [...prev, task]);
         } else {
           setTodos(prev => [...prev, task]);
         }
@@ -502,16 +506,47 @@ export default function ChecklistModal() {
       return;
     }
 
-    // 요일 보드로 이동 (targetDayOffset >= 0)
+    // 2. '보관함' 폴더로 이동 (targetDayOffset === -3)
+    if (targetDayOffset === -3) {
+      if (task.dayIndex === -2 && task.isStorage) return;
+      const storageTitle = `[보관함] ${task.title}`;
+      const updatedTask = { ...task, dayIndex: -2, due: null, isStorage: true, rawTitle: storageTitle };
+      setTodos(prev => prev.filter(t => t.id !== task.id));
+      setOverdueTodos(prev => prev.filter(t => t.id !== task.id));
+      setNoDueTodos(prev => [...prev.filter(t => t.id !== task.id), updatedTask]);
+      setIsStorageOpen(true);
+
+      try {
+        await fetch('/api/trello/checklists', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cardId: task.cardId, itemId: task.id, dueDate: null, name: storageTitle })
+        });
+      } catch (err) {
+        console.error(err);
+        setNoDueTodos(prev => prev.filter(t => t.id !== task.id));
+        if (task.dayIndex === -1) {
+          setOverdueTodos(prev => [...prev, task]);
+        } else if (task.dayIndex === -2) {
+          setNoDueTodos(prev => [...prev, task]);
+        } else {
+          setTodos(prev => [...prev, task]);
+        }
+      }
+      return;
+    }
+
+    // 3. 요일 보드로 이동 (targetDayOffset >= 0)
+    if (task.dayIndex === targetDayOffset) return;
     const currentDue = task.due ? new Date(task.due) : new Date();
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const newDate = new Date(today); newDate.setDate(today.getDate() + targetDayOffset);
     newDate.setHours(task.due ? (currentDue.getHours() || 12) : 12, task.due ? (currentDue.getMinutes() || 0) : 0, 0);
     const newDueIso = newDate.toISOString();
-    const updateTask = (t: any) => t.id === task.id ? { ...t, dayIndex: targetDayOffset, due: newDueIso } : t;
+    const updateTask = (t: any) => t.id === task.id ? { ...t, dayIndex: targetDayOffset, due: newDueIso, isStorage: false, rawTitle: task.title } : t;
     setTodos(prev => {
       if (prev.some(t => t.id === task.id)) return prev.map(updateTask);
-      return [...prev, { ...task, dayIndex: targetDayOffset, due: newDueIso }];
+      return [...prev, { ...task, dayIndex: targetDayOffset, due: newDueIso, isStorage: false, rawTitle: task.title }];
     });
     if (task.dayIndex === -1) {
       setOverdueTodos(prev => prev.filter(t => t.id !== task.id));
@@ -523,7 +558,7 @@ export default function ChecklistModal() {
       await fetch('/api/trello/checklists', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: task.cardId, itemId: task.id, dueDate: newDueIso })
+        body: JSON.stringify({ cardId: task.cardId, itemId: task.id, dueDate: newDueIso, name: task.title })
       });
     } catch (err) { 
       console.error(err); 
@@ -656,6 +691,9 @@ export default function ChecklistModal() {
     return matchesSearch && matchesMember;
   }));
 
+  const filteredRegularNoDue = filteredNoDue.filter(t => !t.isStorage);
+  const filteredStorageNoDue = filteredNoDue.filter(t => t.isStorage);
+
   // Extract unique members from all tasks for filter
   const allMembers = Array.from(new Set([
     ...todos.flatMap(t => t.members || []),
@@ -726,12 +764,20 @@ export default function ChecklistModal() {
         <div className="flex-1 overflow-x-auto overflow-y-hidden p-5 bg-[#f6f5f0] relative min-w-0 custom-scrollbar">
         <div className={`flex gap-4 h-full transition-opacity duration-300 ${loadingTodos ? 'opacity-40' : 'opacity-100'}`} style={{ width: 'max-content' }}>
           {/* 기한 없음 보드 (가장 왼쪽에 항상 표시, 인덱스 개념으로 0개여도 유지) */}
-          <div className="flex flex-col h-full rounded-xl border bg-slate-50/60 border-slate-200 overflow-hidden w-[260px] shrink-0" onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, -2)}>
-            <div className="py-2.5 px-3 text-center text-sm font-bold border-b bg-slate-100/70 text-slate-700 border-slate-200 flex items-center justify-center gap-1">
-              <CheckSquare size={13} className="text-slate-500" /> 기한 없음 ({filteredNoDue.length})
+          <div className="flex flex-col h-full rounded-xl border bg-slate-50/60 border-slate-200 overflow-hidden w-[260px] shrink-0">
+            {/* 상단 헤더 */}
+            <div className="py-2.5 px-3 text-center text-sm font-bold border-b bg-slate-100/70 text-slate-700 border-slate-200 flex items-center justify-center gap-1 shrink-0">
+              <CheckSquare size={13} className="text-slate-500" /> 기한 없음 ({filteredRegularNoDue.length})
             </div>
-            <div className="flex-1 p-2 space-y-2 overflow-y-auto custom-scrollbar" onDoubleClick={() => openAddModal(-2)}>
-              {filteredNoDue.map(task => (
+
+            {/* 상단 단기 할 일 목록 (스크롤 영역) - 드롭 타겟: -2 */}
+            <div 
+              className="flex-1 p-2 space-y-2 overflow-y-auto custom-scrollbar min-h-[120px]" 
+              onDragOver={handleDragOver} 
+              onDrop={(e) => handleDrop(e, -2)} 
+              onDoubleClick={() => openAddModal(-2)}
+            >
+              {filteredRegularNoDue.map(task => (
                 <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task)} onDoubleClick={(e) => e.stopPropagation()} className="p-2.5 rounded-lg border shadow-sm transition-all cursor-move bg-white border-slate-200 hover:border-slate-300">
                   <div className="flex items-start gap-2">
                     <input type="checkbox" checked={task.state === 'complete'} onChange={() => handleCheck(task.id, task.cardId, task.state)} className="mt-1 w-4 h-4 accent-slate-600 rounded cursor-pointer" />
@@ -753,9 +799,61 @@ export default function ChecklistModal() {
                   </div>
                 </div>
               ))}
-              {filteredNoDue.length === 0 && (
+              {filteredRegularNoDue.length === 0 && (
                 <div className="text-center text-slate-400 text-xs py-4 flex items-center justify-center h-full opacity-50 border-2 border-dashed border-slate-200 hover:border-slate-300 rounded-lg cursor-pointer" onDoubleClick={() => openAddModal(-2)}>
                   가져다 놓기 (더블클릭하여 추가)
+                </div>
+              )}
+            </div>
+
+            {/* 하단 고정: 보관함 폴더 (접이식 아코디언) - 드롭 타겟: -3 */}
+            <div 
+              className={`border-t border-slate-200 transition-all duration-300 flex flex-col bg-slate-100/95 shrink-0 ${isStorageOpen ? 'max-h-[50%] shadow-lg' : 'max-h-[42px]'}`}
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, -3)}
+            >
+              <button 
+                type="button"
+                onClick={() => setIsStorageOpen(!isStorageOpen)}
+                className="w-full py-2.5 px-3 flex items-center justify-between text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-200/60 transition-colors select-none"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Archive size={14} className="text-slate-500" />
+                  <span>보관함 ({filteredStorageNoDue.length})</span>
+                </div>
+                <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                  <span>{isStorageOpen ? '접기' : '펼치기'}</span>
+                  <ChevronDown size={14} className={`transform transition-transform duration-200 ${isStorageOpen ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
+
+              {isStorageOpen && (
+                <div className="flex-1 p-2 space-y-2 overflow-y-auto custom-scrollbar border-t border-slate-200/60 bg-slate-50/70">
+                  {filteredStorageNoDue.map(task => (
+                    <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task)} onDoubleClick={(e) => e.stopPropagation()} className="p-2.5 rounded-lg border shadow-sm transition-all cursor-move bg-white border-slate-200 hover:border-slate-300">
+                      <div className="flex items-start gap-2">
+                        <input type="checkbox" checked={task.state === 'complete'} onChange={() => handleCheck(task.id, task.cardId, task.state)} className="mt-1 w-4 h-4 accent-slate-600 rounded cursor-pointer" />
+                        <div className="flex-1 min-w-0 relative pb-5">
+                          <button onClick={() => openCardInTrello(task.cardUrl)} className="block text-left w-full text-[13px] font-bold leading-tight hover:text-sky-600 transition-colors text-slate-700">{task.title}</button>
+                          <div className="text-[11px] text-slate-500 truncate max-w-[170px] mt-1" title={task.cardName}>{task.cardName}</div>
+                          {task.members && task.members.length > 0 && (
+                            <div className="absolute right-0 bottom-0 flex">
+                              {task.members.map((m: any) => (
+                                <div key={m.id} className="w-5 h-5 rounded-full border border-white bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 overflow-hidden shadow-sm" title={m.fullName}>
+                                  {m.avatarUrl ? <img src={`${m.avatarUrl}/30.png`} alt={m.fullName} className="w-full h-full object-cover" /> : m.fullName.charAt(0)}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {filteredStorageNoDue.length === 0 && (
+                    <div className="text-center text-slate-400 text-[11px] py-4 border border-dashed border-slate-200 rounded-lg">
+                      장기 보관할 체크리스트를 이곳에 끌어다 놓으세요.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
